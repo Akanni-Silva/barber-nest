@@ -11,6 +11,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, MoreThan } from 'typeorm';
 import { Appointment } from '../entities/appointment.entity';
 import { CreateAppointmentDto } from '../dto/create-appointment.dto';
+import { UpdateAppointmentDto } from '../dto/update-appointment.dto';
 import { ClientsService } from '../../clients/services/clients.service';
 import { ProductsService } from '../../products/services/products.service';
 
@@ -27,7 +28,7 @@ export class AppointmentsService {
    * Criar um novo agendamento
    */
   async create(createDto: CreateAppointmentDto): Promise<Appointment> {
-    // 1. Buscar ou criar cliente
+    // 1. Buscar ou criar cliente (client_name e client_phone do DTO)
     const client = await this.clientsService.findOrCreate({
       name: createDto.client_name,
       phone: createDto.client_phone,
@@ -51,19 +52,19 @@ export class AppointmentsService {
       throw new ConflictException('Horário não está mais disponível');
     }
 
-    // 4. Criar agendamento - ✅ FORMA CORRETA
+    // 4. Criar agendamento - SEM client_name e client_phone
     const appointment = this.appointmentRepository.create({
-      client: client, // ✅ passa a entidade completa
-      service: service, // ✅ passa a entidade completa
+      client: client, // ✅ Objeto Client completo
+      client_id: client.id, // ✅ FK
+      service: service, // ✅ Objeto Service completo
+      service_id: service.id, // ✅ FK
       appointment_date: createDto.appointment_date,
       appointment_time: createDto.appointment_time,
       notes: createDto.notes,
       status: 'pending',
     });
 
-    const savedAppointment = await this.appointmentRepository.save(appointment);
-
-    return savedAppointment;
+    return await this.appointmentRepository.save(appointment);
   }
 
   /**
@@ -354,5 +355,45 @@ export class AppointmentsService {
     }
 
     await this.appointmentRepository.remove(appointment);
+  }
+
+  async update(
+    id: number,
+    updateDto: UpdateAppointmentDto,
+  ): Promise<Appointment> {
+    const appointment = await this.findById(id);
+
+    if (appointment.status === 'completed') {
+      throw new BadRequestException(
+        'Não é possível atualizar um agendamento já concluído',
+      );
+    }
+
+    if (updateDto.appointment_date || updateDto.appointment_time) {
+      const newDate =
+        updateDto.appointment_date || appointment.appointment_date;
+      const newTime =
+        updateDto.appointment_time || appointment.appointment_time;
+
+      // Verificar disponibilidade apenas se data/hora mudarem
+      if (
+        newDate !== appointment.appointment_date ||
+        newTime !== appointment.appointment_time
+      ) {
+        const isAvailable = await this.checkAvailability(newDate, newTime);
+        if (!isAvailable) {
+          throw new ConflictException('Horário não está disponível');
+        }
+
+        appointment.appointment_date = newDate;
+        appointment.appointment_time = newTime;
+      }
+    }
+
+    if (updateDto.notes !== undefined) {
+      appointment.notes = updateDto.notes;
+    }
+
+    return await this.appointmentRepository.save(appointment);
   }
 }

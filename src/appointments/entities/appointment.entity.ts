@@ -1,3 +1,4 @@
+// src/appointments/entities/appointment.entity.ts
 import {
   Column,
   CreateDateColumn,
@@ -15,6 +16,7 @@ export class Appointment {
   @PrimaryGeneratedColumn()
   id: number;
 
+  //  Relacionamento com Client (eager: true para carregar automaticamente)
   @ManyToOne(() => Client, (client) => client.appointments, {
     eager: true,
     onDelete: 'RESTRICT',
@@ -22,12 +24,10 @@ export class Appointment {
   @JoinColumn({ name: 'client_id' })
   client: Client;
 
-  @Column({ length: 100 })
-  client_name: string;
+  @Column()
+  client_id: number;
 
-  @Column({ length: 20 })
-  client_phone: string;
-
+  //  Relacionamento com Service
   @ManyToOne(() => Product, (product) => product.appointments, {
     eager: true,
     onDelete: 'RESTRICT',

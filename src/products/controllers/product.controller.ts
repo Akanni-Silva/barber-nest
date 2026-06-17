@@ -19,7 +19,10 @@ import { CreateProductDto } from '../dto/create-product.dto';
 import { UpdateProductDto } from '../dto/update-product.dto';
 import { JwtAuthGuard } from '../../auth/guard/jwt-auth.guard';
 import { BarberGuard } from '../../auth/guard/barber.guard';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
+@ApiTags('Produtos')
+@ApiBearerAuth()
 @Controller('products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}

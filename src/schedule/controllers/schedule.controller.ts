@@ -19,7 +19,10 @@ import { CreateSpecialHoursDto } from '../dto/create-special-hours.dto';
 import { CreateBreakTimeDto } from '../dto/create-break-time.dto';
 import { JwtAuthGuard } from '../../auth/guard/jwt-auth.guard';
 import { BarberGuard } from '../../auth/guard/barber.guard';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
+@ApiTags('Agenda')
+@ApiBearerAuth()
 @Controller('schedule')
 export class ScheduleController {
   constructor(private readonly scheduleService: ScheduleService) {}

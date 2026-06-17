@@ -1,8 +1,9 @@
+import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { IsBoolean, IsOptional } from 'class-validator';
 import { CreateClientDto } from './create-client.dto';
-import { PartialType } from '@nestjs/mapped-types';
 
 export class UpdateClientDto extends PartialType(CreateClientDto) {
+  @ApiProperty({ required: false })
   @IsOptional()
   @IsBoolean()
   is_active?: boolean;

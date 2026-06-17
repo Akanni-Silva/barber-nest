@@ -11,6 +11,8 @@ import { AppointmentsModule } from './appointments/appointments.module';
 import { ClientsModule } from './clients/clients.module';
 import { ProductsModule } from './products/products.module';
 import { ScheduleModule } from './schedule/schedule.module';
+import { AuthModule } from './auth/auth.module';
+import { Barber } from './auth/entities/barber.entity';
 
 @Module({
   imports: [
@@ -29,13 +31,15 @@ import { ScheduleModule } from './schedule/schedule.module';
         BlockedDate,
         SpecialHours,
         BreakTime,
+        Barber,
       ],
       synchronize: true,
     }),
-    AppointmentsModule,
+    AuthModule,
     ClientsModule,
     ProductsModule,
     ScheduleModule,
+    AppointmentsModule,
   ],
   controllers: [],
   providers: [],

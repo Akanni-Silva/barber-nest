@@ -1,0 +1,1510 @@
+{
+  "info": {
+    "_postman_id": "barber-nest-complete-collection",
+    "name": "Barber Nest - Complete API Collection",
+    "description": "Coleção completa para testar a API NestJS do Barber App. Inclui autenticação JWT, CRUD de clientes, produtos, agendamentos e gestão de horários. Importe e configure a variável baseUrl se necessário.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "barberId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "clientId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "clientPhone",
+      "value": "+5511999999999",
+      "type": "string"
+    },
+    {
+      "key": "productId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "appointmentId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "workScheduleId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "blockedDateId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "specialHoursId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "breakTimeId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "testDate",
+      "value": "2026-06-20",
+      "type": "string"
+    },
+    {
+      "key": "todayDate",
+      "value": "2026-06-17",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "🔐 AUTHENTICATION",
+      "description": "Endpoints de autenticação do barbeiro",
+      "item": [
+        {
+          "name": "Register Barber",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 - Barbeiro registrado', function() {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "if (json.id) {",
+                  "    pm.collectionVariables.set('barberId', String(json.id));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"João Barbeiro\",\n  \"email\": \"joao@barbearia.com\",\n  \"password\": \"Senha123!\",\n  \"phone\": \"+5511987654321\",\n  \"avatar_url\": \"https://example.com/avatar.jpg\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register"]
+            },
+            "description": "Registrar um novo barbeiro na plataforma.\n\n**Validações:**\n- name: obrigatório\n- email: válido e único\n- password: 6-20 caracteres\n- phone: formato brasileiro válido\n- avatar_url: opcional"
+          }
+        },
+        {
+          "name": "Login Barber",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 - Login bem-sucedido', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "    pm.collectionVariables.set('accessToken', json.access_token);",
+                  "    console.log('✅ Token salvo: ' + json.access_token.substring(0, 20) + '...');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"joao@barbearia.com\",\n  \"password\": \"Senha123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Fazer login do barbeiro. Retorna JWT válido por 7 dias.\n\nO token é automaticamente salvo na variável `accessToken` para uso em requisições autenticadas."
+          }
+        },
+        {
+          "name": "Get Profile (Autenticado)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "profile"]
+            },
+            "description": "Obter dados do perfil do barbeiro autenticado.\n\n**Requer:** JWT válido no header Authorization"
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"current_password\": \"Senha123!\",\n  \"new_password\": \"NovaSenha456!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/change-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "change-password"]
+            },
+            "description": "Alterar senha do barbeiro autenticado.\n\n**Requer:** JWT válido e senha atual correta"
+          }
+        }
+      ]
+    },
+    {
+      "name": "👥 CLIENTS",
+      "description": "Gerenciamento de clientes",
+      "item": [
+        {
+          "name": "Create Client",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 - Cliente criado', function() {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "if (json.id) {",
+                  "    pm.collectionVariables.set('clientId', String(json.id));",
+                  "    console.log('✅ Cliente ID salvo: ' + json.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"João Silva\",\n  \"phone\": \"+5511999999999\",\n  \"notes\": \"Cliente prefere corte baixo, sem máquina zero\",\n  \"preferences\": {\n    \"haircut\": \"degrade\",\n    \"beard\": \"navalha\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/clients",
+              "host": ["{{baseUrl}}"],
+              "path": ["clients"]
+            },
+            "description": "Criar um novo cliente."
+          }
+        },
+        {
+          "name": "Find Or Create Client",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"João Silva\",\n  \"phone\": \"+5511999999999\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/clients/find-or-create",
+              "host": ["{{baseUrl}}"],
+              "path": ["clients", "find-or-create"]
+            },
+            "description": "Buscar cliente por telefone ou criar se não existir."
+          }
+        },
+        {
+          "name": "List All Clients (Paginated)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/clients?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["clients"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Listar todos os clientes com paginação."
+          }
+        },
+        {
+          "name": "Search Clients By Name",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/clients/search?name=joao&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["clients", "search"],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "joao",
+                  "description": "Termo de busca (obrigatório)"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Buscar clientes por nome."
+          }
+        },
+        {
+          "name": "Top Clients (Most Frequent)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/clients/top?limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["clients", "top"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Quantidade de clientes a retornar"
+                }
+              ]
+            },
+            "description": "Listar os clientes mais frequentes (mais agendamentos)."
+          }
+        },
+        {
+          "name": "Top Spenders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/clients/top-spenders?limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["clients", "top-spenders"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Listar clientes que mais gastaram (maior valor total de agendamentos)."
+          }
+        },
+        {
+          "name": "Inactive Clients",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/clients/inactive?days=90",
+              "host": ["{{baseUrl}}"],
+              "path": ["clients", "inactive"],
+              "query": [
+                {
+                  "key": "days",
+                  "value": "90",
+                  "description": "Número de dias para considerar inativo"
+                }
+              ]
+            },
+            "description": "Listar clientes que não visitaram há mais de X dias."
+          }
+        },
+        {
+          "name": "Recent Clients",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/clients/recent?days=30",
+              "host": ["{{baseUrl}}"],
+              "path": ["clients", "recent"],
+              "query": [
+                {
+                  "key": "days",
+                  "value": "30"
+                }
+              ]
+            },
+            "description": "Listar clientes que visitaram nos últimos X dias."
+          }
+        },
+        {
+          "name": "Client Statistics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/clients/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["clients", "stats"]
+            },
+            "description": "Obter estatísticas gerais de clientes (total, ativos, inativos, etc)."
+          }
+        },
+        {
+          "name": "Get Client By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/clients/{{clientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["clients", "{{clientId}}"]
+            },
+            "description": "Obter informações detalhadas de um cliente."
+          }
+        },
+        {
+          "name": "Get Client By Phone",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/clients/phone/{{clientPhone}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["clients", "phone", "{{clientPhone}}"]
+            },
+            "description": "Buscar cliente pelo telefone."
+          }
+        },
+        {
+          "name": "Client Full History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/clients/{{clientId}}/history",
+              "host": ["{{baseUrl}}"],
+              "path": ["clients", "{{clientId}}", "history"]
+            },
+            "description": "Obter histórico completo de agendamentos de um cliente."
+          }
+        },
+        {
+          "name": "Client Upcoming Appointments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/clients/{{clientId}}/upcoming",
+              "host": ["{{baseUrl}}"],
+              "path": ["clients", "{{clientId}}", "upcoming"]
+            },
+            "description": "Listar próximos agendamentos de um cliente."
+          }
+        },
+        {
+          "name": "Client Past Appointments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/clients/{{clientId}}/past",
+              "host": ["{{baseUrl}}"],
+              "path": ["clients", "{{clientId}}", "past"]
+            },
+            "description": "Listar agendamentos passados de um cliente."
+          }
+        },
+        {
+          "name": "Get Client Preferences",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/clients/{{clientId}}/preferences",
+              "host": ["{{baseUrl}}"],
+              "path": ["clients", "{{clientId}}", "preferences"]
+            },
+            "description": "Obter preferências personalizadas do cliente."
+          }
+        },
+        {
+          "name": "Update Client",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"João Silva Santos\",\n  \"notes\": \"Atualizado - Cliente prefere corte degrade\",\n  \"is_active\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/clients/{{clientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["clients", "{{clientId}}"]
+            },
+            "description": "Atualizar informações do cliente."
+          }
+        },
+        {
+          "name": "Save Client Preferences",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"haircut\": \"degrade\",\n  \"beard\": \"navalha\",\n  \"hair_color\": \"castanho\",\n  \"notes\": \"Sem máquina zero, preferência por tesoura\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/clients/{{clientId}}/preferences",
+              "host": ["{{baseUrl}}"],
+              "path": ["clients", "{{clientId}}", "preferences"]
+            },
+            "description": "Salvar preferências personalizadas do cliente."
+          }
+        },
+        {
+          "name": "Add Client Note",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": \"Cliente pagou com cartão, chegou 10min atrasado, mas ficou satisfeito com o corte.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/clients/{{clientId}}/notes",
+              "host": ["{{baseUrl}}"],
+              "path": ["clients", "{{clientId}}", "notes"]
+            },
+            "description": "Adicionar uma observação ao cliente."
+          }
+        },
+        {
+          "name": "Delete Client",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/clients/{{clientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["clients", "{{clientId}}"]
+            },
+            "description": "Deletar um cliente do sistema."
+          }
+        }
+      ]
+    },
+    {
+      "name": "🛒 PRODUCTS/SERVICES",
+      "description": "Gerenciamento de serviços e produtos",
+      "item": [
+        {
+          "name": "Create Product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 - Produto criado', function() {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "if (json.id) {",
+                  "    pm.collectionVariables.set('productId', String(json.id));",
+                  "    console.log('✅ Produto ID salvo: ' + json.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Corte Masculino\",\n  \"price\": 50,\n  \"duration_minutes\": 30\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["products"]
+            },
+            "description": "Criar um novo serviço/produto."
+          }
+        },
+        {
+          "name": "Create Multiple Products (Bulk)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"name\": \"Barba\",\n    \"price\": 35,\n    \"duration_minutes\": 30\n  },\n  {\n    \"name\": \"Corte + Barba\",\n    \"price\": \"80.00\",\n    \"duration_minutes\": 60\n  },\n  {\n    \"name\": \"Pigmentação de Barba\",\n    \"price\": 45,\n    \"duration_minutes\": 45\n  },\n  {\n    \"name\": \"Sobrancelha\",\n    \"price\": 25,\n    \"duration_minutes\": 15\n  }\n]"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products/bulk",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "bulk"]
+            },
+            "description": "Criar múltiplos serviços de uma vez."
+          }
+        },
+        {
+          "name": "List Products (Active Only)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["products"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Listar produtos/serviços ativos."
+          }
+        },
+        {
+          "name": "List All Products (Including Inactive)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/all?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "all"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Listar todos os produtos, incluindo inativos."
+          }
+        },
+        {
+          "name": "Get Active Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/active",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "active"]
+            },
+            "description": "Listar apenas produtos ativos sem paginação."
+          }
+        },
+        {
+          "name": "Product Statistics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "stats"]
+            },
+            "description": "Obter estatísticas de produtos (total, ativos, mais populares, etc)."
+          }
+        },
+        {
+          "name": "Popular Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/popular?limit=5",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "popular"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "5",
+                  "description": "Quantidade de produtos a retornar"
+                }
+              ]
+            },
+            "description": "Listar produtos mais populares (mais agendados)."
+          }
+        },
+        {
+          "name": "Search Products By Name",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/search?name=corte",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "search"],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "corte",
+                  "description": "Termo de busca (obrigatório)"
+                }
+              ]
+            },
+            "description": "Buscar produtos por nome."
+          }
+        },
+        {
+          "name": "Filter Products By Price Range",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/price-range?min=30&max=80",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "price-range"],
+              "query": [
+                {
+                  "key": "min",
+                  "value": "30",
+                  "description": "Preço mínimo"
+                },
+                {
+                  "key": "max",
+                  "value": "80",
+                  "description": "Preço máximo"
+                }
+              ]
+            },
+            "description": "Filtrar produtos por faixa de preço."
+          }
+        },
+        {
+          "name": "Filter Products By Duration",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/duration?max=60",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "duration"],
+              "query": [
+                {
+                  "key": "max",
+                  "value": "60",
+                  "description": "Duração máxima em minutos"
+                }
+              ]
+            },
+            "description": "Filtrar produtos por duração máxima."
+          }
+        },
+        {
+          "name": "Get Product By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{productId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "{{productId}}"]
+            },
+            "description": "Obter detalhes de um produto específico."
+          }
+        },
+        {
+          "name": "Update Product",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Corte Masculino Premium\",\n  \"price\": 60,\n  \"duration_minutes\": 45,\n  \"is_active\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products/{{productId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "{{productId}}"]
+            },
+            "description": "Atualizar informações de um produto."
+          }
+        },
+        {
+          "name": "Activate Product",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{productId}}/activate",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "{{productId}}", "activate"]
+            },
+            "description": "Ativar um produto inativo."
+          }
+        },
+        {
+          "name": "Deactivate Product",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{productId}}/deactivate",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "{{productId}}", "deactivate"]
+            },
+            "description": "Desativar um produto ativo."
+          }
+        },
+        {
+          "name": "Delete Product",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{productId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "{{productId}}"]
+            },
+            "description": "Deletar um produto do sistema."
+          }
+        }
+      ]
+    },
+    {
+      "name": "📅 APPOINTMENTS",
+      "description": "Gerenciamento de agendamentos",
+      "item": [
+        {
+          "name": "Create Appointment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 - Agendamento criado', function() {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "const json = pm.response.json();",
+                  "if (json.id) {",
+                  "    pm.collectionVariables.set('appointmentId', String(json.id));",
+                  "    console.log('✅ Agendamento ID salvo: ' + json.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_name\": \"João Silva\",\n  \"client_phone\": \"{{clientPhone}}\",\n  \"service_id\": {{productId}},\n  \"appointment_date\": \"{{testDate}}\",\n  \"appointment_time\": \"10:00\",\n  \"notes\": \"Agendamento criado via Postman\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/appointments",
+              "host": ["{{baseUrl}}"],
+              "path": ["appointments"]
+            },
+            "description": "Criar um novo agendamento.\n\n**Campo status padrão:** 'pending'"
+          }
+        },
+        {
+          "name": "List Appointments (Filtered)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/appointments?status=pending&startDate=2026-06-01&endDate=2026-06-30&page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["appointments"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "pending",
+                  "description": "pending | confirmed | completed | cancelled"
+                },
+                {
+                  "key": "startDate",
+                  "value": "2026-06-01"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2026-06-30"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Listar agendamentos com filtros opcionais."
+          }
+        },
+        {
+          "name": "Today's Appointments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/appointments/today",
+              "host": ["{{baseUrl}}"],
+              "path": ["appointments", "today"]
+            },
+            "description": "Listar agendamentos de hoje."
+          }
+        },
+        {
+          "name": "Upcoming Appointments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/appointments/upcoming?limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["appointments", "upcoming"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Listar próximos agendamentos."
+          }
+        },
+        {
+          "name": "Appointment Statistics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/appointments/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["appointments", "stats"]
+            },
+            "description": "Obter estatísticas de agendamentos.\n\n**Nota:** Se esta rota retornar erro, verifique a ordem das rotas no controller. /stats deve estar antes de /:id"
+          }
+        },
+        {
+          "name": "Get Appointment By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/appointments/{{appointmentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["appointments", "{{appointmentId}}"]
+            },
+            "description": "Obter detalhes de um agendamento."
+          }
+        },
+        {
+          "name": "Get Client Appointments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/appointments/client/{{clientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["appointments", "client", "{{clientId}}"]
+            },
+            "description": "Listar todos os agendamentos de um cliente."
+          }
+        },
+        {
+          "name": "Confirm Appointment",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/appointments/{{appointmentId}}/confirm",
+              "host": ["{{baseUrl}}"],
+              "path": ["appointments", "{{appointmentId}}", "confirm"]
+            },
+            "description": "Confirmar um agendamento (marcar como confirmado). Pode integrar com WhatsApp para notificação."
+          }
+        },
+        {
+          "name": "Complete Appointment",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/appointments/{{appointmentId}}/complete",
+              "host": ["{{baseUrl}}"],
+              "path": ["appointments", "{{appointmentId}}", "complete"]
+            },
+            "description": "Marcar agendamento como completo (atendimento finalizado)."
+          }
+        },
+        {
+          "name": "Cancel Appointment",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Cliente solicitou cancelamento\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/appointments/{{appointmentId}}/cancel",
+              "host": ["{{baseUrl}}"],
+              "path": ["appointments", "{{appointmentId}}", "cancel"]
+            },
+            "description": "Cancelar um agendamento com motivo opcional."
+          }
+        },
+        {
+          "name": "Reschedule Appointment",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"appointment_date\": \"2026-06-21\",\n  \"appointment_time\": \"14:00\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/appointments/{{appointmentId}}/reschedule",
+              "host": ["{{baseUrl}}"],
+              "path": ["appointments", "{{appointmentId}}", "reschedule"]
+            },
+            "description": "Reagendar um agendamento para nova data/hora."
+          }
+        },
+        {
+          "name": "Update Appointment",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"appointment_date\": \"2026-06-22\",\n  \"appointment_time\": \"15:30\",\n  \"notes\": \"Horário atualizado pelo cliente\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/appointments/{{appointmentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["appointments", "{{appointmentId}}"]
+            },
+            "description": "Atualizar informações de um agendamento."
+          }
+        },
+        {
+          "name": "Delete Appointment",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/appointments/{{appointmentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["appointments", "{{appointmentId}}"]
+            },
+            "description": "Deletar um agendamento do sistema."
+          }
+        }
+      ]
+    },
+    {
+      "name": "⏰ SCHEDULE & AVAILABILITY",
+      "description": "Gerenciamento de horários, pausas, datas bloqueadas e horários especiais",
+      "item": [
+        {
+          "name": "Setup Default Schedule",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/schedule/setup-default",
+              "host": ["{{baseUrl}}"],
+              "path": ["schedule", "setup-default"]
+            },
+            "description": "Configurar horários padrão de funcionamento (seg-sex: 09:00-19:00, sab: 09:00-14:00)."
+          }
+        },
+        {
+          "name": "Create/Update Work Schedule",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.id) {",
+                  "    pm.collectionVariables.set('workScheduleId', String(json.id));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"day_of_week\": 1,\n  \"is_working\": true,\n  \"start_time\": \"09:00\",\n  \"end_time\": \"19:00\",\n  \"slot_duration\": 30,\n  \"lunch_start\": \"12:00\",\n  \"lunch_end\": \"13:00\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/schedule/work-schedule",
+              "host": ["{{baseUrl}}"],
+              "path": ["schedule", "work-schedule"]
+            },
+            "description": "Criar ou atualizar horário de trabalho para um dia da semana.\n\n**day_of_week:** 0=Domingo, 1=Segunda, ..., 6=Sábado"
+          }
+        },
+        {
+          "name": "List All Work Schedules",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/schedule/work-schedule",
+              "host": ["{{baseUrl}}"],
+              "path": ["schedule", "work-schedule"]
+            },
+            "description": "Listar horários de trabalho de todos os dias."
+          }
+        },
+        {
+          "name": "Get Work Schedule By Day",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/schedule/work-schedule/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["schedule", "work-schedule", "1"],
+              "query": [
+                {
+                  "key": "dayOfWeek",
+                  "value": "1",
+                  "description": "0=Domingo a 6=Sábado"
+                }
+              ]
+            },
+            "description": "Obter horário de trabalho de um dia específico."
+          }
+        },
+        {
+          "name": "Update Work Schedule",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"start_time\": \"08:30\",\n  \"end_time\": \"18:30\",\n  \"slot_duration\": 30,\n  \"lunch_start\": \"12:00\",\n  \"lunch_end\": \"13:00\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/schedule/work-schedule/{{workScheduleId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["schedule", "work-schedule", "{{workScheduleId}}"]
+            },
+            "description": "Atualizar horário de trabalho existente."
+          }
+        },
+        {
+          "name": "Delete Work Schedule",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/schedule/work-schedule/{{workScheduleId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["schedule", "work-schedule", "{{workScheduleId}}"]
+            },
+            "description": "Deletar horário de trabalho."
+          }
+        },
+        {
+          "name": "Create Blocked Date",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.id) {",
+                  "    pm.collectionVariables.set('blockedDateId', String(json.id));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"blocked_date\": \"2026-06-25\",\n  \"reason\": \"Feriado prolongado\",\n  \"is_full_day\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/schedule/blocked-dates",
+              "host": ["{{baseUrl}}"],
+              "path": ["schedule", "blocked-dates"]
+            },
+            "description": "Bloquear uma data ou período para não permitir agendamentos."
+          }
+        },
+        {
+          "name": "List Blocked Dates",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/schedule/blocked-dates?startDate=2026-06-01&endDate=2026-06-30",
+              "host": ["{{baseUrl}}"],
+              "path": ["schedule", "blocked-dates"],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2026-06-01"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2026-06-30"
+                }
+              ]
+            },
+            "description": "Listar datas bloqueadas."
+          }
+        },
+        {
+          "name": "Delete Blocked Date",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/schedule/blocked-dates/{{blockedDateId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["schedule", "blocked-dates", "{{blockedDateId}}"]
+            },
+            "description": "Remover bloqueio de uma data."
+          }
+        },
+        {
+          "name": "Create Special Hours",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.id) {",
+                  "    pm.collectionVariables.set('specialHoursId', String(json.id));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"special_date\": \"2026-06-24\",\n  \"description\": \"Atendimento especial - Aniversário\",\n  \"start_time\": \"10:00\",\n  \"end_time\": \"20:00\",\n  \"slot_duration\": 30,\n  \"is_active\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/schedule/special-hours",
+              "host": ["{{baseUrl}}"],
+              "path": ["schedule", "special-hours"]
+            },
+            "description": "Criar horários especiais de atendimento para uma data específica."
+          }
+        },
+        {
+          "name": "List Special Hours",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/schedule/special-hours",
+              "host": ["{{baseUrl}}"],
+              "path": ["schedule", "special-hours"]
+            },
+            "description": "Listar horários especiais configurados."
+          }
+        },
+        {
+          "name": "Update Special Hours",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Atendimento especial - Aniversário ATUALIZADO\",\n  \"start_time\": \"09:00\",\n  \"end_time\": \"21:00\",\n  \"is_active\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/schedule/special-hours/{{specialHoursId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["schedule", "special-hours", "{{specialHoursId}}"]
+            },
+            "description": "Atualizar horários especiais."
+          }
+        },
+        {
+          "name": "Delete Special Hours",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/schedule/special-hours/{{specialHoursId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["schedule", "special-hours", "{{specialHoursId}}"]
+            },
+            "description": "Deletar horários especiais."
+          }
+        },
+        {
+          "name": "Create Break Time",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.id) {",
+                  "    pm.collectionVariables.set('breakTimeId', String(json.id));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"break_date\": \"{{testDate}}\",\n  \"start_time\": \"15:00\",\n  \"end_time\": \"15:30\",\n  \"reason\": \"Pausa para café\",\n  \"is_recurring\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/schedule/breaks",
+              "host": ["{{baseUrl}}"],
+              "path": ["schedule", "breaks"]
+            },
+            "description": "Criar intervalo/pausa durante o atendimento."
+          }
+        },
+        {
+          "name": "Get Breaks By Date",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/schedule/breaks/{{testDate}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["schedule", "breaks", "{{testDate}}"]
+            },
+            "description": "Listar pausas/intervalos de uma data específica."
+          }
+        },
+        {
+          "name": "Delete Break Time",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/schedule/breaks/{{breakTimeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["schedule", "breaks", "{{breakTimeId}}"]
+            },
+            "description": "Deletar um intervalo/pausa."
+          }
+        },
+        {
+          "name": "Get Working Hours For Date",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/schedule/working-hours?date={{testDate}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["schedule", "working-hours"],
+              "query": [
+                {
+                  "key": "date",
+                  "value": "{{testDate}}",
+                  "description": "Data em formato ISO (obrigatório)"
+                }
+              ]
+            },
+            "description": "Obter horários de funcionamento para uma data específica (considerando pausas, bloqueios, etc)."
+          }
+        },
+        {
+          "name": "Get Available Slots",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/schedule/available-slots?date={{testDate}}&duration=30",
+              "host": ["{{baseUrl}}"],
+              "path": ["schedule", "available-slots"],
+              "query": [
+                {
+                  "key": "date",
+                  "value": "{{testDate}}",
+                  "description": "Data em formato ISO (obrigatório)"
+                },
+                {
+                  "key": "duration",
+                  "value": "30",
+                  "description": "Duração em minutos (padrão: 30)"
+                }
+              ]
+            },
+            "description": "Obter slots disponíveis para agendamento em uma data e duração específicas."
+          }
+        }
+      ]
+    }
+  ]
+}

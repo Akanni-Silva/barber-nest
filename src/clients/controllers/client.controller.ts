@@ -12,40 +12,35 @@ import {
   ParseIntPipe,
   HttpStatus,
   HttpCode,
+  UseGuards,
 } from '@nestjs/common';
 import { ClientsService } from '../services/clients.service';
 import { CreateClientDto } from '../dto/create-client.dto';
 import { UpdateClientDto } from '../dto/update-client.dto';
+import { JwtAuthGuard } from '../../auth/guard/jwt-auth.guard';
+import { BarberGuard } from '../../auth/guard/barber.guard';
 
 @Controller('clients')
 export class ClientsController {
   constructor(private readonly clientsService: ClientsService) {}
 
-  /**
-   * Criar um novo cliente
-   * POST /clients
-   */
+  // ✅ PÚBLICO - Cliente pode se cadastrar
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async create(@Body() createDto: CreateClientDto) {
     return await this.clientsService.create(createDto);
   }
 
-  /**
-   * Buscar ou criar cliente por telefone (útil para agendamentos)
-   * POST /clients/find-or-create
-   */
+  // ✅ PÚBLICO - Usado no agendamento
   @Post('find-or-create')
   @HttpCode(HttpStatus.OK)
   async findOrCreate(@Body() createDto: CreateClientDto) {
     return await this.clientsService.findOrCreate(createDto);
   }
 
-  /**
-   * Listar todos os clientes (paginado)
-   * GET /clients?page=1&limit=20
-   */
+  // ❌ PROTEGIDO - Apenas barbeiro
   @Get()
+  @UseGuards(JwtAuthGuard, BarberGuard)
   async findAll(
     @Query('page', ParseIntPipe) page: number = 1,
     @Query('limit', ParseIntPipe) limit: number = 20,
@@ -53,11 +48,9 @@ export class ClientsController {
     return await this.clientsService.findAll(page, limit);
   }
 
-  /**
-   * Buscar clientes por nome (busca parcial)
-   * GET /clients/search?name=joao&limit=10
-   */
+  // ❌ PROTEGIDO - Apenas barbeiro
   @Get('search')
+  @UseGuards(JwtAuthGuard, BarberGuard)
   async searchByName(
     @Query('name') name: string,
     @Query('limit', ParseIntPipe) limit: number = 10,
@@ -65,110 +58,85 @@ export class ClientsController {
     return await this.clientsService.searchByName(name, limit);
   }
 
-  /**
-   * Buscar clientes mais frequentes (top clientes)
-   * GET /clients/top?limit=10
-   */
+  // ❌ PROTEGIDO - Apenas barbeiro
   @Get('top')
+  @UseGuards(JwtAuthGuard, BarberGuard)
   async getTopClients(@Query('limit', ParseIntPipe) limit: number = 10) {
     return await this.clientsService.findTopClients(limit);
   }
 
-  /**
-   * Buscar clientes que mais gastaram
-   * GET /clients/top-spenders?limit=10
-   */
+  // ❌ PROTEGIDO - Apenas barbeiro
   @Get('top-spenders')
+  @UseGuards(JwtAuthGuard, BarberGuard)
   async getTopSpenders(@Query('limit', ParseIntPipe) limit: number = 10) {
     return await this.clientsService.findTopSpenders(limit);
   }
 
-  /**
-   * Buscar clientes inativos (sem visita há X dias)
-   * GET /clients/inactive?days=90
-   */
+  // ❌ PROTEGIDO - Apenas barbeiro
   @Get('inactive')
+  @UseGuards(JwtAuthGuard, BarberGuard)
   async getInactiveClients(@Query('days', ParseIntPipe) days: number = 90) {
     return await this.clientsService.findInactiveClients(days);
   }
 
-  /**
-   * Buscar clientes recentes (visitaram nos últimos X dias)
-   * GET /clients/recent?days=30
-   */
+  // ❌ PROTEGIDO - Apenas barbeiro
   @Get('recent')
+  @UseGuards(JwtAuthGuard, BarberGuard)
   async getRecentClients(@Query('days', ParseIntPipe) days: number = 30) {
     return await this.clientsService.findRecentClients(days);
   }
 
-  /**
-   * Estatísticas gerais de clientes
-   * GET /clients/stats
-   */
+  // ❌ PROTEGIDO - Apenas barbeiro
   @Get('stats')
+  @UseGuards(JwtAuthGuard, BarberGuard)
   async getStats() {
     return await this.clientsService.getStats();
   }
 
-  /**
-   * Buscar cliente por ID
-   * GET /clients/1
-   */
+  // ✅ PÚBLICO - Cliente pode consultar próprio cadastro (opcional)
   @Get(':id')
   async findById(@Param('id', ParseIntPipe) id: number) {
     return await this.clientsService.findById(id);
   }
 
-  /**
-   * Buscar cliente por telefone
-   * GET /clients/phone/+5511999999999
-   */
+  // ❌ PROTEGIDO - Apenas barbeiro
   @Get('phone/:phone')
+  @UseGuards(JwtAuthGuard, BarberGuard)
   async findByPhone(@Param('phone') phone: string) {
     return await this.clientsService.findByPhone(phone);
   }
 
-  /**
-   * Buscar histórico completo de agendamentos do cliente
-   * GET /clients/1/history
-   */
+  // ❌ PROTEGIDO - Apenas barbeiro
   @Get(':id/history')
+  @UseGuards(JwtAuthGuard, BarberGuard)
   async getHistory(@Param('id', ParseIntPipe) id: number) {
     return await this.clientsService.getAppointmentHistory(id);
   }
 
-  /**
-   * Buscar próximos agendamentos do cliente (futuros)
-   * GET /clients/1/upcoming
-   */
+  // ❌ PROTEGIDO - Apenas barbeiro
   @Get(':id/upcoming')
+  @UseGuards(JwtAuthGuard, BarberGuard)
   async getUpcoming(@Param('id', ParseIntPipe) id: number) {
     return await this.clientsService.getUpcomingAppointments(id);
   }
 
-  /**
-   * Buscar agendamentos passados do cliente
-   * GET /clients/1/past
-   */
+  // ❌ PROTEGIDO - Apenas barbeiro
   @Get(':id/past')
+  @UseGuards(JwtAuthGuard, BarberGuard)
   async getPast(@Param('id', ParseIntPipe) id: number) {
     return await this.clientsService.getPastAppointments(id);
   }
 
-  /**
-   * Buscar preferências do cliente
-   * GET /clients/1/preferences
-   */
+  // ❌ PROTEGIDO - Apenas barbeiro
   @Get(':id/preferences')
+  @UseGuards(JwtAuthGuard, BarberGuard)
   async getPreferences(@Param('id', ParseIntPipe) id: number) {
     return await this.clientsService.getPreferences(id);
   }
 
-  /**
-   * Atualizar dados do cliente
-   * PUT /clients/1
-   */
+  // ❌ PROTEGIDO - Apenas barbeiro
   @Put(':id')
+  @UseGuards(JwtAuthGuard, BarberGuard)
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateDto: UpdateClientDto,
@@ -176,11 +144,9 @@ export class ClientsController {
     return await this.clientsService.update(id, updateDto);
   }
 
-  /**
-   * Salvar preferências do cliente
-   * PUT /clients/1/preferences
-   */
+  // ❌ PROTEGIDO - Apenas barbeiro
   @Put(':id/preferences')
+  @UseGuards(JwtAuthGuard, BarberGuard)
   async savePreferences(
     @Param('id', ParseIntPipe) id: number,
     @Body() preferences: any,
@@ -188,11 +154,9 @@ export class ClientsController {
     return await this.clientsService.savePreferences(id, preferences);
   }
 
-  /**
-   * Adicionar observação sobre o cliente
-   * POST /clients/1/notes
-   */
+  // ❌ PROTEGIDO - Apenas barbeiro
   @Post(':id/notes')
+  @UseGuards(JwtAuthGuard, BarberGuard)
   @HttpCode(HttpStatus.OK)
   async addNote(
     @Param('id', ParseIntPipe) id: number,
@@ -201,45 +165,30 @@ export class ClientsController {
     return await this.clientsService.addNote(id, note);
   }
 
-  /**
-   * Desativar cliente (soft delete)
-   * DELETE /clients/1/deactivate
-   */
+  // ❌ PROTEGIDO - Apenas barbeiro
   @Delete(':id/deactivate')
+  @UseGuards(JwtAuthGuard, BarberGuard)
   @HttpCode(HttpStatus.OK)
   async deactivate(@Param('id', ParseIntPipe) id: number) {
     await this.clientsService.deactivate(id);
-    return {
-      message: 'Cliente desativado com sucesso',
-      statusCode: HttpStatus.OK,
-    };
+    return { message: 'Cliente desativado com sucesso' };
   }
 
-  /**
-   * Reativar cliente
-   * POST /clients/1/activate
-   */
+  // ❌ PROTEGIDO - Apenas barbeiro
   @Post(':id/activate')
+  @UseGuards(JwtAuthGuard, BarberGuard)
   @HttpCode(HttpStatus.OK)
   async activate(@Param('id', ParseIntPipe) id: number) {
     await this.clientsService.activate(id);
-    return {
-      message: 'Cliente reativado com sucesso',
-      statusCode: HttpStatus.OK,
-    };
+    return { message: 'Cliente reativado com sucesso' };
   }
 
-  /**
-   * Deletar cliente (apenas se não tiver agendamentos futuros)
-   * DELETE /clients/1
-   */
+  // ❌ PROTEGIDO - Apenas barbeiro
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, BarberGuard)
   @HttpCode(HttpStatus.OK)
   async delete(@Param('id', ParseIntPipe) id: number) {
     await this.clientsService.delete(id);
-    return {
-      message: 'Cliente removido com sucesso',
-      statusCode: HttpStatus.OK,
-    };
+    return { message: 'Cliente removido com sucesso' };
   }
 }

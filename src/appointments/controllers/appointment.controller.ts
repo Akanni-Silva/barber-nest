@@ -13,30 +13,28 @@ import {
   ParseIntPipe,
   HttpStatus,
   HttpCode,
+  UseGuards,
 } from '@nestjs/common';
 import { AppointmentsService } from '../services/appointments.service';
 import { CreateAppointmentDto } from '../dto/create-appointment.dto';
 import { UpdateAppointmentDto } from '../dto/update-appointment.dto';
+import { JwtAuthGuard } from '../../auth/guard/jwt-auth.guard';
+import { BarberGuard } from '../../auth/guard/barber.guard';
 
 @Controller('appointments')
 export class AppointmentsController {
   constructor(private readonly appointmentsService: AppointmentsService) {}
 
-  /**
-   * Criar um novo agendamento
-   * POST /appointments
-   */
+  // ✅ PÚBLICO - Cliente pode criar agendamento
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async create(@Body() createDto: CreateAppointmentDto) {
     return await this.appointmentsService.create(createDto);
   }
 
-  /**
-   * Listar todos os agendamentos (com filtros)
-   * GET /appointments?status=confirmed&startDate=2024-01-01&endDate=2024-01-31&page=1&limit=20
-   */
+  // ❌ PROTEGIDO - Apenas barbeiro
   @Get()
+  @UseGuards(JwtAuthGuard, BarberGuard)
   async findAll(
     @Query('status') status?: string,
     @Query('startDate') startDate?: string,
@@ -53,77 +51,59 @@ export class AppointmentsController {
     });
   }
 
-  /**
-   * Listar agendamentos do dia
-   * GET /appointments/today
-   */
+  // ❌ PROTEGIDO - Apenas barbeiro
   @Get('today')
+  @UseGuards(JwtAuthGuard, BarberGuard)
   async findToday() {
     return await this.appointmentsService.findToday();
   }
 
-  /**
-   * Listar agendamentos futuros
-   * GET /appointments/upcoming?limit=10
-   */
+  // ❌ PROTEGIDO - Apenas barbeiro
   @Get('upcoming')
+  @UseGuards(JwtAuthGuard, BarberGuard)
   async findUpcoming(@Query('limit', ParseIntPipe) limit: number = 10) {
     return await this.appointmentsService.findUpcoming(limit);
   }
 
-  /**
-   * Buscar agendamento por ID
-   * GET /appointments/1
-   */
+  // ❌ PROTEGIDO - Apenas barbeiro
+  @Get('stats')
+  @UseGuards(JwtAuthGuard, BarberGuard)
+  async getStats() {
+    return await this.appointmentsService.getStats();
+  }
+
+  // ✅ PÚBLICO - Cliente pode ver status do agendamento
   @Get(':id')
   async findById(@Param('id', ParseIntPipe) id: number) {
     return await this.appointmentsService.findById(id);
   }
 
-  /**
-   * Buscar agendamentos por cliente
-   * GET /appointments/client/1
-   */
+  // ❌ PROTEGIDO - Apenas barbeiro
   @Get('client/:clientId')
+  @UseGuards(JwtAuthGuard, BarberGuard)
   async findByClient(@Param('clientId', ParseIntPipe) clientId: number) {
     return await this.appointmentsService.findByClient(clientId);
   }
 
-  /**
-   * Estatísticas de agendamentos
-   * GET /appointments/stats
-   */
-  @Get('stats')
-  async getStats() {
-    return await this.appointmentsService.getStats();
-  }
-
-  /**
-   * Confirmar agendamento (via WhatsApp)
-   * PATCH /appointments/1/confirm
-   */
+  // ❌ PROTEGIDO - Apenas barbeiro
   @Patch(':id/confirm')
+  @UseGuards(JwtAuthGuard, BarberGuard)
   @HttpCode(HttpStatus.OK)
   async confirm(@Param('id', ParseIntPipe) id: number) {
     return await this.appointmentsService.confirm(id);
   }
 
-  /**
-   * Completar agendamento (atendimento finalizado)
-   * PATCH /appointments/1/complete
-   */
+  // ❌ PROTEGIDO - Apenas barbeiro
   @Patch(':id/complete')
+  @UseGuards(JwtAuthGuard, BarberGuard)
   @HttpCode(HttpStatus.OK)
   async complete(@Param('id', ParseIntPipe) id: number) {
     return await this.appointmentsService.complete(id);
   }
 
-  /**
-   * Cancelar agendamento
-   * PATCH /appointments/1/cancel
-   * Body: { "reason": "Cliente não compareceu" }
-   */
+  // ❌ PROTEGIDO - Apenas barbeiro
   @Patch(':id/cancel')
+  @UseGuards(JwtAuthGuard, BarberGuard)
   @HttpCode(HttpStatus.OK)
   async cancel(
     @Param('id', ParseIntPipe) id: number,
@@ -132,11 +112,9 @@ export class AppointmentsController {
     return await this.appointmentsService.cancel(id, reason);
   }
 
-  /**
-   * Reagendar agendamento
-   * PUT /appointments/1/reschedule
-   */
+  // ❌ PROTEGIDO - Apenas barbeiro
   @Put(':id/reschedule')
+  @UseGuards(JwtAuthGuard, BarberGuard)
   @HttpCode(HttpStatus.OK)
   async reschedule(
     @Param('id', ParseIntPipe) id: number,
@@ -146,32 +124,22 @@ export class AppointmentsController {
     return await this.appointmentsService.reschedule(id, newDate, newTime);
   }
 
-  /**
-   * Atualizar dados do agendamento (apenas notes e status)
-   * PUT /appointments/1
-   */
+  // ❌ PROTEGIDO - Apenas barbeiro
   @Put(':id')
+  @UseGuards(JwtAuthGuard, BarberGuard)
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateDto: UpdateAppointmentDto,
   ) {
-    // Nota: Este método precisa ser implementado no service se necessário
-    // Para agora, vamos apenas retornar que não está implementado
-    // Ou podemos usar o método existente
     return await this.appointmentsService.update(id, updateDto);
   }
 
-  /**
-   * Deletar agendamento (apenas se pendente ou cancelado)
-   * DELETE /appointments/1
-   */
+  // ❌ PROTEGIDO - Apenas barbeiro
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, BarberGuard)
   @HttpCode(HttpStatus.OK)
   async delete(@Param('id', ParseIntPipe) id: number) {
     await this.appointmentsService.delete(id);
-    return {
-      message: 'Agendamento removido com sucesso',
-      statusCode: HttpStatus.OK,
-    };
+    return { message: 'Agendamento removido com sucesso' };
   }
 }

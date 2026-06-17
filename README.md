@@ -1,98 +1,184 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Barber Nest API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+API backend para uma barbearia construída com NestJS, TypeORM e MySQL.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Visão Geral
 
-## Description
+Este projeto fornece endpoints para gerenciamento de:
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- Autenticação de barbeiros
+- Clientes
+- Produtos e serviços
+- Agendamentos
+- Agenda de trabalho e horários especiais
 
-## Project setup
+A aplicação roda por padrão na porta `4000` e utiliza `TypeORM` com MySQL.
 
-```bash
-$ npm install
-```
+## Tecnologias
 
-## Compile and run the project
+- NestJS
+- TypeScript
+- TypeORM
+- MySQL
+- Passport JWT
+- bcrypt
+- class-validator / class-transformer
 
-```bash
-# development
-$ npm run start
+## Requisitos
 
-# watch mode
-$ npm run start:dev
+- Node.js 20+ recomendado
+- npm
+- MySQL rodando localmente
 
-# production mode
-$ npm run start:prod
-```
+## Configuração do Banco de Dados
 
-## Run tests
+A configuração atual do TypeORM está em `src/app.module.ts`:
 
-```bash
-# unit tests
-$ npm run test
+- host: `localhost`
+- port: `3306`
+- username: `root`
+- password: `root`
+- database: `db_barber`
+- synchronize: `true`
 
-# e2e tests
-$ npm run test:e2e
+> Atualize essas credenciais conforme necessário para o seu ambiente.
 
-# test coverage
-$ npm run test:cov
-```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## Instalação
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+npm install
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+## Execução
 
-## Resources
+```bash
+npm run start:dev
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+A API será iniciada em `http://localhost:4000` por padrão.
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+## Scripts úteis
 
-## Support
+- `npm run build` - compila o projeto
+- `npm run start` - inicia a aplicação em modo padrão
+- `npm run start:dev` - inicia em modo de desenvolvimento com watch
+- `npm run lint` - executa ESLint e corrige problemas
+- `npm run test` - executa testes unitários
+- `npm run test:e2e` - executa testes de integração
+- `npm run test:cov` - executa cobertura de testes
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+## Módulos e recursos
 
-## Stay in touch
+### Auth
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+Endpoints principais:
 
-## License
+- `POST /auth/register` - criar barbeiro
+- `POST /auth/login` - login e geração de JWT
+- `GET /auth/profile` - perfil do barbeiro (autenticado)
+- `PATCH /auth/change-password` - alterar senha (autenticado)
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+### Clients
+
+Rotas para criação, busca, atualização e estatísticas de clientes:
+
+- `POST /clients`
+- `POST /clients/find-or-create`
+- `GET /clients`
+- `GET /clients/search`
+- `GET /clients/top`
+- `GET /clients/top-spenders`
+- `GET /clients/inactive`
+- `GET /clients/recent`
+- `GET /clients/stats`
+- `GET /clients/:id`
+- `GET /clients/phone/:phone`
+- `GET /clients/:id/history`
+- `GET /clients/:id/upcoming`
+- `GET /clients/:id/past`
+- `GET /clients/:id/preferences`
+- `PUT /clients/:id`
+- `PUT /clients/:id/preferences`
+- `POST /clients/:id/notes`
+- `DELETE /clients/:id/deactivate`
+- `POST /clients/:id/activate`
+- `DELETE /clients/:id`
+
+### Products
+
+Gerencia serviços/produtos da barbearia:
+
+- `POST /products`
+- `GET /products`
+- `GET /products/active`
+- `GET /products/stats`
+- `GET /products/popular`
+- `GET /products/search`
+- `GET /products/price-range`
+- `GET /products/:id`
+- `PUT /products/:id`
+- `PUT /products/:id/activate`
+- `PUT /products/:id/deactivate`
+- `DELETE /products/:id`
+
+### Appointments
+
+Endpoints para agendamentos e status:
+
+- `POST /appointments`
+- `GET /appointments`
+- `GET /appointments/today`
+- `GET /appointments/upcoming`
+- `GET /appointments/stats`
+- `GET /appointments/:id`
+- `GET /appointments/client/:clientId`
+- `PATCH /appointments/:id/confirm`
+- `PATCH /appointments/:id/complete`
+- `PATCH /appointments/:id/cancel`
+- `PUT /appointments/:id/reschedule`
+- `PUT /appointments/:id`
+- `DELETE /appointments/:id`
+
+### Schedule
+
+Gestão de horários de trabalho, bloqueios e horários especiais:
+
+- `GET /schedule/available-slots`
+- `GET /schedule/working-hours`
+- `POST /schedule/setup-default`
+- `POST /schedule/work-schedule`
+- `GET /schedule/work-schedule`
+- `GET /schedule/work-schedule/:dayOfWeek`
+- `PUT /schedule/work-schedule/:id`
+- `DELETE /schedule/work-schedule/:id`
+- `POST /schedule/blocked-dates`
+- `GET /schedule/blocked-dates`
+- `DELETE /schedule/blocked-dates/:id`
+- `POST /schedule/special-hours`
+- `GET /schedule/special-hours`
+- `PUT /schedule/special-hours/:id`
+- `DELETE /schedule/special-hours/:id`
+- `POST /schedule/breaks`
+- `GET /schedule/breaks/:date`
+- `DELETE /schedule/breaks/:id`
+
+## Postman
+
+A coleção Postman está disponível em:
+
+- `postman/barber-nest.postman_collection.json`
+- `postman/barber-nest-dev-environment.postman_environment.json`
+
+Use esses arquivos para testar a API com os endpoints e variáveis configuradas para `http://localhost:4000`.
+
+## Observações
+
+- A API utiliza `ValidationPipe` global em `src/main.ts`.
+- CORS está habilitado por padrão.
+- A aplicação inclui entidades para `Appointment`, `Client`, `Product`, `WorkSchedule`, `BlockedDate`, `SpecialHours`, `BreakTime` e `Barber`.
+
+## Ajustes recomendados
+
+- Extraia o `TypeORM` config para variáveis de ambiente para uso em diferentes ambientes.
+- Remova `synchronize: true` em produção para evitar alterações automatizadas no esquema do banco.
+- Adicione testes automatizados e documentação de contratos se desejar suportar mais clientes.

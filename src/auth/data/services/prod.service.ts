@@ -26,7 +26,6 @@ export class ProdService implements TypeOrmOptionsFactory {
         max: 20,
         connectionTimeoutMillis: 30000,
         idleTimeoutMillis: 30000,
-        family: 4,
         // ✅ SSL também pode ser configurado aqui
         ssl: {
           rejectUnauthorized: false,

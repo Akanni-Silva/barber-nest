@@ -20,7 +20,7 @@ export class ProdService implements TypeOrmOptionsFactory {
       ssl: {
         rejectUnauthorized: false,
       },
-      synchronize: true,
+      synchronize: !isProduction,
       autoLoadEntities: true,
       extra: {
         max: 20,

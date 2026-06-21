@@ -7,6 +7,7 @@ import { WorkSchedule } from '../../../schedule/entities/work-schedule.entity';
 import { BlockedDate } from '../../../schedule/entities/blocked-date.entity';
 import { BreakTime } from '../../../schedule/entities/break-time.entity';
 import { SpecialHours } from '../../../schedule/entities/special-hours.entity';
+import { Barber } from '../../entities/barber.entity';
 
 @Injectable()
 export class DevService implements TypeOrmOptionsFactory {
@@ -26,6 +27,7 @@ export class DevService implements TypeOrmOptionsFactory {
         BlockedDate,
         BreakTime,
         SpecialHours,
+        Barber,
       ],
       synchronize: true,
     };

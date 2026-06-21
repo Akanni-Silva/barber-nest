@@ -1,3 +1,4 @@
+// src/auth/strategies/jwt.strategy.ts
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
@@ -8,7 +9,6 @@ interface JwtPayload {
   sub: number;
   email: string;
   name: string;
-  role: string;
   iat?: number;
   exp?: number;
 }
@@ -27,19 +27,17 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     id: number;
     email: string;
     name: string;
-    role: string;
   }> {
     const barber = await this.authService.findById(payload.sub);
 
     if (!barber) {
-      throw new UnauthorizedException('Barbeiro nao encontrado ou inativo');
+      throw new UnauthorizedException('Barbeiro não encontrado ou inativo');
     }
 
     return {
       id: payload.sub,
       email: payload.email,
       name: payload.name,
-      role: payload.role,
     };
   }
 }

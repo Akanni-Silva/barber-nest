@@ -1,5 +1,5 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import {
   Injectable,
   CanActivate,
@@ -17,11 +17,8 @@ export class BarberGuard implements CanActivate {
       throw new ForbiddenException('Usuário não autenticado');
     }
 
-    // Verificar se o usuário tem a role de barbeiro
-    if (user.role !== 'barber') {
-      throw new ForbiddenException('Acesso restrito ao barbeiro');
-    }
-
+    // ✅ Como só existe UM barbeiro, qualquer usuário autenticado é o barbeiro
+    // Não precisa verificar role
     return true;
   }
 }

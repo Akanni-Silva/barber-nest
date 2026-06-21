@@ -4,6 +4,7 @@ import {
   UnauthorizedException,
   ConflictException,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -31,15 +32,45 @@ export class AuthService {
     private bcrypt: Bcrypt,
   ) {}
 
+  /**
+   * ✅ Verificar se já existe um barbeiro registrado
+   */
+  async canRegister(): Promise<{ canRegister: boolean; message?: string }> {
+    const barberCount = await this.barberRepository.count();
+
+    if (barberCount > 0) {
+      return {
+        canRegister: false,
+        message:
+          'Já existe um barbeiro registrado. Faça login para acessar o sistema.',
+      };
+    }
+
+    return {
+      canRegister: true,
+      message: 'Nenhum barbeiro registrado. Crie sua conta agora.',
+    };
+  }
+
+  /**
+   * ✅ Registrar o primeiro e ÚNICO barbeiro
+   */
   async register(
     registerDto: RegisterDto,
   ): Promise<{ message: string; barber: PublicBarber }> {
+    // 🔒 Verificar se já existe barbeiro
+    const canRegister = await this.canRegister();
+
+    if (!canRegister.canRegister) {
+      throw new ForbiddenException(canRegister.message);
+    }
+
     const existingBarber = await this.barberRepository.findOne({
       where: { email: registerDto.email },
     });
 
     if (existingBarber) {
-      throw new ConflictException('Email ja esta em uso');
+      throw new ConflictException('Email já está em uso');
     }
 
     const passwordHash = await this.bcrypt.hashPassword(registerDto.password);
@@ -56,7 +87,8 @@ export class AuthService {
     const savedBarber = await this.barberRepository.save(barber);
 
     return {
-      message: 'Barbeiro registrado com sucesso',
+      message:
+        '✅ Barbeiro registrado com sucesso! Agora você pode fazer login.',
       barber: removePasswordHash(savedBarber),
     };
   }
@@ -67,7 +99,7 @@ export class AuthService {
     });
 
     if (!barber) {
-      throw new UnauthorizedException('Email ou senha invalidos');
+      throw new UnauthorizedException('Email ou senha inválidos');
     }
 
     if (!barber.is_active) {
@@ -80,7 +112,7 @@ export class AuthService {
     );
 
     if (!matchPassword) {
-      throw new UnauthorizedException('Email ou senha invalidos');
+      throw new UnauthorizedException('Email ou senha inválidos');
     }
 
     return removePasswordHash(barber);
@@ -98,7 +130,6 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       name: user.name,
-      role: 'barber',
     };
 
     const token = this.jwtService.sign(payload);
@@ -122,7 +153,7 @@ export class AuthService {
     });
 
     if (!barber) {
-      throw new NotFoundException('Barbeiro nao encontrado');
+      throw new NotFoundException('Barbeiro não encontrado');
     }
 
     const isPasswordValid = await this.bcrypt.comparePassword(
@@ -148,7 +179,7 @@ export class AuthService {
     });
 
     if (!barber) {
-      throw new NotFoundException('Barbeiro nao encontrado');
+      throw new NotFoundException('Barbeiro não encontrado');
     }
 
     return removePasswordHash(barber);

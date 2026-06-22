@@ -171,6 +171,93 @@ A coleção Postman está disponível em:
 
 Use esses arquivos para testar a API com os endpoints e variáveis configuradas para `http://localhost:4000`.
 
+# Estrutura do codigo
+
+```
+├── 📁 appointments
+│   ├── 📁 controllers
+│   │   └── 📄 appointment.controller.ts
+│   ├── 📁 dto
+│   │   ├── 📄 create-appointment.dto.ts
+│   │   └── 📄 update-appointment.dto.ts
+│   ├── 📁 entities
+│   │   └── 📄 appointment.entity.ts
+│   ├── 📁 services
+│   │   └── 📄 appointments.service.ts
+│   └── 📄 appointments.module.ts
+├── 📁 auth
+│   ├── 📁 bcrypt
+│   │   └── 📄 bcrypt.ts
+│   ├── 📁 constants
+│   │   └── 📄 constants.ts
+│   ├── 📁 controllers
+│   │   └── 📄 auth.controller.ts
+│   ├── 📁 data
+│   │   └── 📁 services
+│   │       ├── 📄 dev.service.ts
+│   │       └── 📄 prod.service.ts
+│   ├── 📁 dto
+│   │   ├── 📄 change-password.dto.ts
+│   │   ├── 📄 login.dto.ts
+│   │   └── 📄 register.dto.ts
+│   ├── 📁 entities
+│   │   └── 📄 barber.entity.ts
+│   ├── 📁 guard
+│   │   ├── 📄 barber.guard.ts
+│   │   ├── 📄 jwt-auth.guard.ts
+│   │   └── 📄 local-auth.guard.ts
+│   ├── 📁 services
+│   │   └── 📄 auth.service.ts
+│   ├── 📁 strategy
+│   │   ├── 📄 jwt.strategy.ts
+│   │   └── 📄 local.strategy.ts
+│   └── 📄 auth.module.ts
+├── 📁 clients
+│   ├── 📁 controllers
+│   │   └── 📄 client.controller.ts
+│   ├── 📁 dto
+│   │   ├── 📄 create-client.dto.ts
+│   │   ├── 📄 response-client.dto.ts
+│   │   └── 📄 update-client.dto.ts
+│   ├── 📁 entities
+│   │   └── 📄 client.entity.ts
+│   ├── 📁 services
+│   │   └── 📄 clients.service.ts
+│   └── 📄 clients.module.ts
+├── 📁 products
+│   ├── 📁 controllers
+│   │   └── 📄 product.controller.ts
+│   ├── 📁 dto
+│   │   ├── 📄 create-product.dto.ts
+│   │   └── 📄 update-product.dto.ts
+│   ├── 📁 entities
+│   │   └── 📄 product.entity.ts
+│   ├── 📁 services
+│   │   └── 📄 products.service.ts
+│   └── 📄 products.module.ts
+├── 📁 schedule
+│   ├── 📁 controllers
+│   │   └── 📄 schedule.controller.ts
+│   ├── 📁 dto
+│   │   ├── 📄 create-blocked-date.dto.ts
+│   │   ├── 📄 create-break-time.dto.ts
+│   │   ├── 📄 create-special-hours.dto.ts
+│   │   ├── 📄 create-work-schedule.dto.ts
+│   │   └── 📄 update-work-schedule.dto.ts
+│   ├── 📁 entities
+│   │   ├── 📄 blocked-date.entity.ts
+│   │   ├── 📄 break-time.entity.ts
+│   │   ├── 📄 special-hours.entity.ts
+│   │   └── 📄 work-schedule.entity.ts
+│   ├── 📁 services
+│   │   └── 📄 schedule.service.ts
+│   └── 📄 schedule.module.ts
+├── 📄 app.controller.ts
+├── 📄 app.module.ts
+├── 📄 app.service.ts
+└── 📄 main.ts
+```
+
 ## Observações
 
 - A API utiliza `ValidationPipe` global em `src/main.ts`.

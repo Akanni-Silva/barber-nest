@@ -171,7 +171,7 @@ A coleção Postman está disponível em:
 
 Use esses arquivos para testar a API com os endpoints e variáveis configuradas para `http://localhost:4000`.
 
-# Estrutura do codigo
+# Estrutura do projeto
 
 ```
 ├── 📁 appointments

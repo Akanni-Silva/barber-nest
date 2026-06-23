@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 
@@ -9,6 +8,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { Repository, Between, MoreThan, In, DataSource } from 'typeorm';
 import { Appointment } from '../entities/appointment.entity';
 import { CreateAppointmentDto } from '../dto/create-appointment.dto';
@@ -27,16 +27,14 @@ export class AppointmentsService {
   ) {}
 
   /**
-   * ✅ Criar um novo agendamento com TRANSAÇÃO E LOCK
+   * Criar um novo agendamento com transação e lock
    */
   async create(createDto: CreateAppointmentDto): Promise<Appointment> {
-    // 1. Buscar ou criar cliente
     const client = await this.clientsService.findOrCreate({
       name: createDto.client_name,
       phone: createDto.client_phone,
     });
 
-    // 2. Verificar se serviço existe
     const service = await this.productsService.findById(createDto.service_id);
     if (!service) {
       throw new NotFoundException(
@@ -44,25 +42,22 @@ export class AppointmentsService {
       );
     }
 
-    // ✅ 3. Validar se a data/hora é no futuro
     const now = new Date();
     const selectedDateTime = new Date(createDto.appointment_date);
     const [hours, minutes] = createDto.appointment_time.split(':').map(Number);
     selectedDateTime.setHours(hours, minutes, 0, 0);
 
-    if (selectedDateTime < now) {
+    if (selectedDateTime.getTime() < now.getTime()) {
       throw new BadRequestException(
         'Não é possível agendar para um horário que já passou',
       );
     }
 
-    // ✅ 4. Usar transação com lock pessimista
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-      // ✅ 5. Verificar disponibilidade com LOCK (FOR UPDATE)
       const existing = await queryRunner.manager
         .createQueryBuilder(Appointment, 'appointment')
         .where(
@@ -82,7 +77,6 @@ export class AppointmentsService {
         throw new ConflictException('Horário não está mais disponível');
       }
 
-      // 6. Criar agendamento
       const appointment = queryRunner.manager.create(Appointment, {
         client: client,
         client_id: client.id,
@@ -106,9 +100,6 @@ export class AppointmentsService {
     }
   }
 
-  /**
-   * Buscar todos agendamentos (com filtros)
-   */
   async findAll(filters?: {
     status?: string;
     startDate?: Date;
@@ -154,9 +145,6 @@ export class AppointmentsService {
     return { appointments, total };
   }
 
-  /**
-   * Buscar agendamento por ID
-   */
   async findById(id: number): Promise<Appointment> {
     const appointment = await this.appointmentRepository.findOne({
       where: { id },
@@ -173,9 +161,6 @@ export class AppointmentsService {
     return appointment;
   }
 
-  /**
-   * Buscar agendamentos por cliente
-   */
   async findByClient(clientId: number): Promise<Appointment[]> {
     return await this.appointmentRepository.find({
       where: { client: { id: clientId } },
@@ -189,9 +174,6 @@ export class AppointmentsService {
     });
   }
 
-  /**
-   * Buscar agendamentos do dia
-   */
   async findToday(): Promise<Appointment[]> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -214,9 +196,6 @@ export class AppointmentsService {
     });
   }
 
-  /**
-   * Buscar agendamentos futuros
-   */
   async findUpcoming(limit: number = 10): Promise<Appointment[]> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -238,9 +217,6 @@ export class AppointmentsService {
     });
   }
 
-  /**
-   * Confirmar agendamento
-   */
   async confirm(id: number): Promise<Appointment> {
     const appointment = await this.findById(id);
 
@@ -253,21 +229,16 @@ export class AppointmentsService {
     appointment.status = 'confirmed';
     const updated = await this.appointmentRepository.save(appointment);
 
-    // Garantir que o preço é um número
     const price =
       typeof appointment.service.price === 'string'
         ? parseFloat(appointment.service.price)
         : appointment.service.price;
 
-    // Atualizar estatísticas do cliente
     await this.clientsService.updateStats(appointment.client.id, price);
 
     return updated;
   }
 
-  /**
-   * Completar agendamento (atendimento finalizado)
-   */
   async complete(id: number): Promise<Appointment> {
     const appointment = await this.findById(id);
 
@@ -281,9 +252,6 @@ export class AppointmentsService {
     return await this.appointmentRepository.save(appointment);
   }
 
-  /**
-   * Cancelar agendamento
-   */
   async cancel(id: number, reason?: string): Promise<Appointment> {
     const appointment = await this.findById(id);
 
@@ -301,9 +269,6 @@ export class AppointmentsService {
     return await this.appointmentRepository.save(appointment);
   }
 
-  /**
-   * ✅ Verificar disponibilidade de horário (método auxiliar)
-   */
   private async checkAvailability(date: Date, time: string): Promise<boolean> {
     const count = await this.appointmentRepository
       .createQueryBuilder('appointment')
@@ -317,9 +282,6 @@ export class AppointmentsService {
     return count === 0;
   }
 
-  /**
-   * Reagendar um agendamento
-   */
   async reschedule(
     id: number,
     newDate: Date,
@@ -333,13 +295,12 @@ export class AppointmentsService {
       );
     }
 
-    // ✅ Validar se a nova data/hora é no futuro
     const now = new Date();
     const selectedDateTime = new Date(newDate);
     const [hours, minutes] = newTime.split(':').map(Number);
     selectedDateTime.setHours(hours, minutes, 0, 0);
 
-    if (selectedDateTime < now) {
+    if (selectedDateTime.getTime() < now.getTime()) {
       throw new BadRequestException(
         'Não é possível reagendar para um horário que já passou',
       );
@@ -357,9 +318,6 @@ export class AppointmentsService {
     return await this.appointmentRepository.save(appointment);
   }
 
-  /**
-   * Estatísticas de agendamentos
-   */
   async getStats(): Promise<any> {
     const total = await this.appointmentRepository.count();
     const pending = await this.appointmentRepository.count({
@@ -392,9 +350,6 @@ export class AppointmentsService {
     };
   }
 
-  /**
-   * Deletar agendamento (apenas se pendente ou cancelado)
-   */
   async delete(id: number): Promise<void> {
     const appointment = await this.findById(id);
 
@@ -410,9 +365,6 @@ export class AppointmentsService {
     await this.appointmentRepository.remove(appointment);
   }
 
-  /**
-   * Atualizar agendamento
-   */
   async update(
     id: number,
     updateDto: UpdateAppointmentDto,
@@ -435,13 +387,12 @@ export class AppointmentsService {
         newDate !== appointment.appointment_date ||
         newTime !== appointment.appointment_time
       ) {
-        // ✅ Validar se a nova data/hora é no futuro
         const now = new Date();
         const selectedDateTime = new Date(newDate);
         const [hours, minutes] = newTime.split(':').map(Number);
         selectedDateTime.setHours(hours, minutes, 0, 0);
 
-        if (selectedDateTime < now) {
+        if (selectedDateTime.getTime() < now.getTime()) {
           throw new BadRequestException(
             'Não é possível atualizar para um horário que já passou',
           );

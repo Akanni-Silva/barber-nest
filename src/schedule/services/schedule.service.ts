@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/restrict-template-expressions */
 // src/schedule/services/schedule.service.ts
 import {
   Injectable,
@@ -312,35 +311,48 @@ export class ScheduleService {
   }
 
   /**
-   * Gerar slots disponíveis para uma data
+   * Gerar slots disponíveis para uma data (COM LOGS PARA DEBUG)
    */
   async generateAvailableSlots(
     date: Date,
     serviceDuration: number = 30,
   ): Promise<string[]> {
+    console.log('🔍 generateAvailableSlots chamado para:', date);
+
     const workingHours = await this.getWorkingHoursForDate(date);
+    console.log('📊 workingHours:', workingHours);
 
     if (!workingHours.is_working) {
+      console.log('❌ Dia não está trabalhando');
       return [];
     }
 
     if (!workingHours.start_time || !workingHours.end_time) {
+      console.log('❌ start_time ou end_time ausentes');
       return [];
     }
 
-    const breaks = await this.findBreaksByDate(date);
+    console.log(
+      `✅ Horário de trabalho: ${workingHours.start_time} - ${workingHours.end_time}`,
+    );
 
-    // Buscar agendamentos ocupados (pending e confirmed)
+    // Buscar pausas do dia
+    const breaks = await this.findBreaksByDate(date);
+    console.log('📊 Pausas do dia:', breaks);
+
+    // Buscar agendamentos ocupados
     const existingAppointments = await this.appointmentRepository.find({
       where: {
         appointment_date: date,
         status: In(['confirmed', 'pending']),
       },
     });
+    console.log('📊 Agendamentos ocupados:', existingAppointments);
 
     const busyTimes = new Set(
       existingAppointments.map((a) => a.appointment_time),
     );
+    console.log('📊 Horários ocupados:', Array.from(busyTimes));
 
     const now = new Date();
     const todayStr = now.toISOString().split('T')[0];
@@ -350,6 +362,10 @@ export class ScheduleService {
     let currentTimeSlot = workingHours.start_time;
     const endTime = workingHours.end_time;
     const slotDuration = workingHours.slot_duration || 30;
+
+    console.log(
+      `🔄 Gerando slots de ${currentTimeSlot} até ${endTime} com duração de ${slotDuration}min`,
+    );
 
     while (
       this.timeToMinutes(currentTimeSlot) + serviceDuration <=
@@ -390,12 +406,18 @@ export class ScheduleService {
 
         if (!isPastSlot) {
           slots.push(currentTimeSlot);
+          console.log(`✅ Slot adicionado: ${currentTimeSlot}`);
+        } else {
+          console.log(`⏰ Horário passado ignorado: ${currentTimeSlot}`);
         }
+      } else {
+        console.log(`❌ Horário ocupado ignorado: ${currentTimeSlot}`);
       }
 
       currentTimeSlot = this.addMinutes(currentTimeSlot, slotDuration);
     }
 
+    console.log(`📋 Total de slots gerados: ${slots.length}`, slots);
     return slots;
   }
 

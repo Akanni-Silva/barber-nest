@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable @typescript-eslint/restrict-template-expressions */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import {
   ConflictException,
   Injectable,
@@ -27,7 +26,7 @@ export class AppointmentsService {
   ) {}
 
   /**
-   * ✅ Criar um novo agendamento com validação completa
+   * ✅ Criar um novo agendamento com validação CORRETA
    */
   async create(createDto: CreateAppointmentDto): Promise<Appointment> {
     // 1. Validar dados obrigatórios
@@ -59,20 +58,7 @@ export class AppointmentsService {
       );
     }
 
-    // 4. Validar formato da data
-    let appointmentDate: Date;
-    try {
-      appointmentDate = new Date(createDto.appointment_date);
-      if (isNaN(appointmentDate.getTime())) {
-        throw new Error('Data inválida');
-      }
-    } catch {
-      throw new BadRequestException(
-        `Formato de data inválido: ${createDto.appointment_date}`,
-      );
-    }
-
-    // 5. Validar formato do horário
+    // 4. Validar formato do horário
     const timeParts = createDto.appointment_time.split(':');
     if (timeParts.length < 2) {
       throw new BadRequestException(
@@ -99,26 +85,34 @@ export class AppointmentsService {
       throw new BadRequestException(`Horário inválido: ${formattedTime}`);
     }
 
-    // 6. Validar se a data/hora é no futuro
+    // ✅ 5. Validar se a data/hora é no futuro (APENAS PARA HOJE)
     const now = new Date();
+    const appointmentDate = new Date(createDto.appointment_date);
     appointmentDate.setHours(hours, minutes, 0, 0);
 
-    const appointmentTimestamp = appointmentDate.getTime();
-    const nowTimestamp = now.getTime();
+    // ✅ Verificar se a data do agendamento é hoje
+    const todayStr = now.toISOString().split('T')[0];
+    const appointmentDateStr = new Date(createDto.appointment_date)
+      .toISOString()
+      .split('T')[0];
 
-    if (appointmentTimestamp < nowTimestamp - 60000) {
-      throw new BadRequestException(
-        `Não é possível agendar para um horário que já passou (${formattedTime})`,
-      );
+    // ✅ Só validar horário passado se for o dia atual
+    if (appointmentDateStr === todayStr) {
+      const diffMinutes = (appointmentDate.getTime() - now.getTime()) / 60000;
+      if (diffMinutes < -2) {
+        throw new BadRequestException(
+          `Não é possível agendar para um horário que já passou (${formattedTime})`,
+        );
+      }
     }
 
-    // 7. Usar transação com lock pessimista
+    // 6. Usar transação com lock pessimista
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-      // 8. Verificar disponibilidade com LOCK (FOR UPDATE)
+      // 7. Verificar disponibilidade com LOCK (FOR UPDATE)
       const existing = await queryRunner.manager
         .createQueryBuilder(Appointment, 'appointment')
         .where(
@@ -138,7 +132,7 @@ export class AppointmentsService {
         throw new ConflictException('Horário não está mais disponível');
       }
 
-      // 9. Criar agendamento - FORMA CORRETA
+      // 8. Criar agendamento
       const appointment = new Appointment();
       appointment.client = client;
       appointment.client_id = client.id;
@@ -401,19 +395,22 @@ export class AppointmentsService {
       formattedTime = `${newTime}:00`;
     }
 
-    // Validar se a nova data/hora é no futuro
-    const now = new Date();
-    const appointmentDate = new Date(newDate);
+    // Validar se a nova data/hora é no futuro (APENAS PARA HOJE)
     const [hours, minutes] = formattedTime.split(':').map(Number);
+    const appointmentDate = new Date(newDate);
     appointmentDate.setHours(hours, minutes, 0, 0);
 
-    const appointmentTimestamp = appointmentDate.getTime();
-    const nowTimestamp = now.getTime();
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const appointmentDateStr = new Date(newDate).toISOString().split('T')[0];
 
-    if (appointmentTimestamp < nowTimestamp - 60000) {
-      throw new BadRequestException(
-        'Não é possível reagendar para um horário que já passou',
-      );
+    if (appointmentDateStr === todayStr) {
+      const diffMinutes = (appointmentDate.getTime() - now.getTime()) / 60000;
+      if (diffMinutes < -2) {
+        throw new BadRequestException(
+          'Não é possível reagendar para um horário que já passou',
+        );
+      }
     }
 
     const isAvailable = await this.checkAvailability(newDate, formattedTime);
@@ -517,19 +514,25 @@ export class AppointmentsService {
           newTime = `${newTime}:00`;
         }
 
-        // Validar se a nova data/hora é no futuro
-        const now = new Date();
-        const appointmentDate = new Date(newDate);
+        // Validar se a nova data/hora é no futuro (APENAS PARA HOJE)
         const [hours, minutes] = newTime.split(':').map(Number);
+        const appointmentDate = new Date(newDate);
         appointmentDate.setHours(hours, minutes, 0, 0);
 
-        const appointmentTimestamp = appointmentDate.getTime();
-        const nowTimestamp = now.getTime();
+        const now = new Date();
+        const todayStr = now.toISOString().split('T')[0];
+        const appointmentDateStr = new Date(newDate)
+          .toISOString()
+          .split('T')[0];
 
-        if (appointmentTimestamp < nowTimestamp - 60000) {
-          throw new BadRequestException(
-            'Não é possível atualizar para um horário que já passou',
-          );
+        if (appointmentDateStr === todayStr) {
+          const diffMinutes =
+            (appointmentDate.getTime() - now.getTime()) / 60000;
+          if (diffMinutes < -2) {
+            throw new BadRequestException(
+              'Não é possível atualizar para um horário que já passou',
+            );
+          }
         }
 
         const isAvailable = await this.checkAvailability(newDate, newTime);

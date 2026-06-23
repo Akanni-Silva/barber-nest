@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/restrict-template-expressions */
-
+// src/schedule/services/schedule.service.ts
 import {
   Injectable,
   NotFoundException,
@@ -33,6 +33,8 @@ export class ScheduleService {
     @InjectRepository(Appointment)
     private appointmentRepository: Repository<Appointment>,
   ) {}
+
+  // ==================== WORK SCHEDULE ====================
 
   async upsertWorkSchedule(
     createDto: CreateWorkScheduleDto,
@@ -102,6 +104,8 @@ export class ScheduleService {
     await this.workScheduleRepository.remove(schedule);
   }
 
+  // ==================== BLOCKED DATES ====================
+
   async blockDate(createDto: CreateBlockedDateDto): Promise<BlockedDate> {
     const existing = await this.blockedDateRepository.findOne({
       where: { blocked_date: createDto.blocked_date },
@@ -154,6 +158,8 @@ export class ScheduleService {
 
     await this.blockedDateRepository.remove(blocked);
   }
+
+  // ==================== SPECIAL HOURS ====================
 
   async createSpecialHours(
     createDto: CreateSpecialHoursDto,
@@ -216,6 +222,8 @@ export class ScheduleService {
     await this.specialHoursRepository.remove(specialHours);
   }
 
+  // ==================== BREAK TIMES ====================
+
   async createBreakTime(createDto: CreateBreakTimeDto): Promise<BreakTime> {
     const breakTime = this.breakTimeRepository.create(createDto);
     return await this.breakTimeRepository.save(breakTime);
@@ -251,6 +259,8 @@ export class ScheduleService {
 
     await this.breakTimeRepository.remove(breakTime);
   }
+
+  // ==================== UTILITÁRIOS ====================
 
   async getWorkingHoursForDate(date: Date): Promise<{
     is_working: boolean;
@@ -293,14 +303,17 @@ export class ScheduleService {
 
     return {
       is_working: true,
-      start_time: schedule.start_time,
-      end_time: schedule.end_time,
-      slot_duration: schedule.slot_duration,
+      start_time: schedule.start_time || '09:00',
+      end_time: schedule.end_time || '19:00',
+      slot_duration: schedule.slot_duration || 30,
       lunch_start: schedule.lunch_start,
       lunch_end: schedule.lunch_end,
     };
   }
 
+  /**
+   * Gerar slots disponíveis para uma data
+   */
   async generateAvailableSlots(
     date: Date,
     serviceDuration: number = 30,
@@ -317,6 +330,7 @@ export class ScheduleService {
 
     const breaks = await this.findBreaksByDate(date);
 
+    // Buscar agendamentos ocupados (pending e confirmed)
     const existingAppointments = await this.appointmentRepository.find({
       where: {
         appointment_date: date,
@@ -341,6 +355,7 @@ export class ScheduleService {
       this.timeToMinutes(currentTimeSlot) + serviceDuration <=
       this.timeToMinutes(endTime)
     ) {
+      // Verificar horário de almoço
       if (workingHours.lunch_start && workingHours.lunch_end) {
         if (
           currentTimeSlot >= workingHours.lunch_start &&
@@ -351,6 +366,7 @@ export class ScheduleService {
         }
       }
 
+      // Verificar pausas
       let isBreak = false;
       for (const breakItem of breaks) {
         if (
@@ -365,7 +381,9 @@ export class ScheduleService {
 
       if (isBreak) continue;
 
+      // Pular horários ocupados
       if (!busyTimes.has(currentTimeSlot)) {
+        // Verificar se o horário é no futuro (apenas para hoje)
         const isPastSlot =
           date.toISOString().split('T')[0] === todayStr &&
           currentTimeSlot < currentTime;
@@ -439,6 +457,8 @@ export class ScheduleService {
       }
     }
   }
+
+  // ==================== UTILITÁRIOS PRIVADOS ====================
 
   private timeToMinutes(time: string): number {
     if (!time) return 0;

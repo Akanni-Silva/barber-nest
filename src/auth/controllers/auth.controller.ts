@@ -19,7 +19,12 @@ import { LoginDto } from '../dto/login.dto';
 import { ChangePasswordDto } from '../dto/change-password.dto';
 import { JwtAuthGuard } from '../guard/jwt-auth.guard';
 import { BarberGuard } from '../guard/barber.guard';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 
 @ApiTags('Autenticacao')
 @ApiBearerAuth()
@@ -29,18 +34,29 @@ export class AuthController {
 
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Registrar barbeiro' })
+  @ApiResponse({ status: 201, description: 'Barbeiro registrado com sucesso' })
+  @ApiResponse({ status: 403, description: 'Cadastro não permitido' })
+  @ApiResponse({ status: 409, description: 'Email já está em uso' })
   async register(@Body() registerDto: RegisterDto) {
     return await this.authService.register(registerDto);
   }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Autenticar barbeiro' })
+  @ApiResponse({ status: 200, description: 'Login realizado com sucesso' })
+  @ApiResponse({ status: 401, description: 'Credenciais inválidas' })
   async login(@Body() loginDto: LoginDto) {
     return await this.authService.login(loginDto);
   }
 
   @Get('profile')
   @UseGuards(JwtAuthGuard, BarberGuard)
+  @ApiOperation({ summary: 'Buscar perfil do barbeiro' })
+  @ApiResponse({ status: 200, description: 'Perfil encontrado' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 404, description: 'Barbeiro não encontrado' })
   async getProfile(@Request() req) {
     return await this.authService.getProfile(req.user.id);
   }
@@ -48,6 +64,10 @@ export class AuthController {
   @Patch('change-password')
   @UseGuards(JwtAuthGuard, BarberGuard)
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Alterar senha do barbeiro' })
+  @ApiResponse({ status: 200, description: 'Senha alterada com sucesso' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 404, description: 'Barbeiro não encontrado' })
   async changePassword(
     @Request() req,
     @Body() changePasswordDto: ChangePasswordDto,

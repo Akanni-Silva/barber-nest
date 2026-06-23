@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-// src/appointments/services/appointments.service.ts
+
 import {
   ConflictException,
   Injectable,
@@ -44,10 +44,24 @@ export class AppointmentsService {
       );
     }
 
-    // ✅ 3. Validar se a data/hora é no futuro
+    // ✅ 3. Validar formato do horário
+    const timeParts = createDto.appointment_time.split(':');
+    if (timeParts.length < 2) {
+      throw new BadRequestException(
+        'Formato de horário inválido. Use HH:mm ou HH:mm:ss',
+      );
+    }
+
+    // ✅ Garantir que o horário tenha segundos (HH:mm:ss)
+    let formattedTime = createDto.appointment_time;
+    if (timeParts.length === 2) {
+      formattedTime = `${createDto.appointment_time}:00`;
+    }
+
+    // ✅ 4. Validar se a data/hora é no futuro
     const now = new Date();
     const appointmentDate = new Date(createDto.appointment_date);
-    const [hours, minutes] = createDto.appointment_time.split(':').map(Number);
+    const [hours, minutes] = formattedTime.split(':').map(Number);
     appointmentDate.setHours(hours, minutes, 0, 0);
 
     const appointmentTimestamp = appointmentDate.getTime();
@@ -56,24 +70,24 @@ export class AppointmentsService {
     // ✅ Verificar se é no futuro (com margem de 1 minuto)
     if (appointmentTimestamp < nowTimestamp - 60000) {
       throw new BadRequestException(
-        `Não é possível agendar para um horário que já passou (${createDto.appointment_time})`,
+        `Não é possível agendar para um horário que já passou (${formattedTime})`,
       );
     }
 
-    // ✅ 4. Usar transação com lock pessimista
+    // ✅ 5. Usar transação com lock pessimista
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-      // ✅ 5. Verificar disponibilidade com LOCK (FOR UPDATE)
+      // ✅ 6. Verificar disponibilidade com LOCK (FOR UPDATE)
       const existing = await queryRunner.manager
         .createQueryBuilder(Appointment, 'appointment')
         .where(
           'appointment.appointment_date = :date AND appointment.appointment_time = :time',
           {
             date: createDto.appointment_date,
-            time: createDto.appointment_time,
+            time: formattedTime,
           },
         )
         .andWhere('appointment.status IN (:...statuses)', {
@@ -86,14 +100,14 @@ export class AppointmentsService {
         throw new ConflictException('Horário não está mais disponível');
       }
 
-      // 6. Criar agendamento
+      // 7. Criar agendamento
       const appointment = queryRunner.manager.create(Appointment, {
         client: client,
         client_id: client.id,
         service: service,
         service_id: service.id,
         appointment_date: createDto.appointment_date,
-        appointment_time: createDto.appointment_time,
+        appointment_time: formattedTime,
         notes: createDto.notes,
         status: 'pending',
       });
@@ -306,7 +320,7 @@ export class AppointmentsService {
   }
 
   /**
-   * ✅ Verificar disponibilidade de horário (método auxiliar)
+   * Verificar disponibilidade de horário (método auxiliar)
    */
   private async checkAvailability(date: Date, time: string): Promise<boolean> {
     const count = await this.appointmentRepository
@@ -337,10 +351,23 @@ export class AppointmentsService {
       );
     }
 
-    // ✅ Validar se a nova data/hora é no futuro
+    // Validar formato do horário
+    const timeParts = newTime.split(':');
+    if (timeParts.length < 2) {
+      throw new BadRequestException(
+        'Formato de horário inválido. Use HH:mm ou HH:mm:ss',
+      );
+    }
+
+    let formattedTime = newTime;
+    if (timeParts.length === 2) {
+      formattedTime = `${newTime}:00`;
+    }
+
+    // Validar se a nova data/hora é no futuro
     const now = new Date();
     const appointmentDate = new Date(newDate);
-    const [hours, minutes] = newTime.split(':').map(Number);
+    const [hours, minutes] = formattedTime.split(':').map(Number);
     appointmentDate.setHours(hours, minutes, 0, 0);
 
     const appointmentTimestamp = appointmentDate.getTime();
@@ -352,13 +379,13 @@ export class AppointmentsService {
       );
     }
 
-    const isAvailable = await this.checkAvailability(newDate, newTime);
+    const isAvailable = await this.checkAvailability(newDate, formattedTime);
     if (!isAvailable) {
       throw new ConflictException('Horário não está disponível');
     }
 
     appointment.appointment_date = newDate;
-    appointment.appointment_time = newTime;
+    appointment.appointment_time = formattedTime;
     appointment.status = 'pending';
 
     return await this.appointmentRepository.save(appointment);
@@ -435,14 +462,25 @@ export class AppointmentsService {
     if (updateDto.appointment_date || updateDto.appointment_time) {
       const newDate =
         updateDto.appointment_date || appointment.appointment_date;
-      const newTime =
-        updateDto.appointment_time || appointment.appointment_time;
+      let newTime = updateDto.appointment_time || appointment.appointment_time;
 
       if (
         newDate !== appointment.appointment_date ||
         newTime !== appointment.appointment_time
       ) {
-        // ✅ Validar se a nova data/hora é no futuro
+        // Validar formato do horário
+        const timeParts = newTime.split(':');
+        if (timeParts.length < 2) {
+          throw new BadRequestException(
+            'Formato de horário inválido. Use HH:mm ou HH:mm:ss',
+          );
+        }
+
+        if (timeParts.length === 2) {
+          newTime = `${newTime}:00`;
+        }
+
+        // Validar se a nova data/hora é no futuro
         const now = new Date();
         const appointmentDate = new Date(newDate);
         const [hours, minutes] = newTime.split(':').map(Number);

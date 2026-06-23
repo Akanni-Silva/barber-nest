@@ -23,7 +23,7 @@ export class AppointmentsService {
     private appointmentRepository: Repository<Appointment>,
     private clientsService: ClientsService,
     private productsService: ProductsService,
-    private dataSource: DataSource, // ✅ Para transações
+    private dataSource: DataSource,
   ) {}
 
   /**
@@ -44,13 +44,25 @@ export class AppointmentsService {
       );
     }
 
-    // ✅ 3. Usar transação com lock pessimista
+    // ✅ 3. Validar se a data/hora é no futuro
+    const now = new Date();
+    const selectedDateTime = new Date(createDto.appointment_date);
+    const [hours, minutes] = createDto.appointment_time.split(':').map(Number);
+    selectedDateTime.setHours(hours, minutes, 0, 0);
+
+    if (selectedDateTime < now) {
+      throw new BadRequestException(
+        'Não é possível agendar para um horário que já passou',
+      );
+    }
+
+    // ✅ 4. Usar transação com lock pessimista
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-      // ✅ 4. Verificar disponibilidade com LOCK (FOR UPDATE)
+      // ✅ 5. Verificar disponibilidade com LOCK (FOR UPDATE)
       const existing = await queryRunner.manager
         .createQueryBuilder(Appointment, 'appointment')
         .where(
@@ -70,7 +82,7 @@ export class AppointmentsService {
         throw new ConflictException('Horário não está mais disponível');
       }
 
-      // 5. Criar agendamento
+      // 6. Criar agendamento
       const appointment = queryRunner.manager.create(Appointment, {
         client: client,
         client_id: client.id,
@@ -321,6 +333,18 @@ export class AppointmentsService {
       );
     }
 
+    // ✅ Validar se a nova data/hora é no futuro
+    const now = new Date();
+    const selectedDateTime = new Date(newDate);
+    const [hours, minutes] = newTime.split(':').map(Number);
+    selectedDateTime.setHours(hours, minutes, 0, 0);
+
+    if (selectedDateTime < now) {
+      throw new BadRequestException(
+        'Não é possível reagendar para um horário que já passou',
+      );
+    }
+
     const isAvailable = await this.checkAvailability(newDate, newTime);
     if (!isAvailable) {
       throw new ConflictException('Horário não está disponível');
@@ -411,6 +435,18 @@ export class AppointmentsService {
         newDate !== appointment.appointment_date ||
         newTime !== appointment.appointment_time
       ) {
+        // ✅ Validar se a nova data/hora é no futuro
+        const now = new Date();
+        const selectedDateTime = new Date(newDate);
+        const [hours, minutes] = newTime.split(':').map(Number);
+        selectedDateTime.setHours(hours, minutes, 0, 0);
+
+        if (selectedDateTime < now) {
+          throw new BadRequestException(
+            'Não é possível atualizar para um horário que já passou',
+          );
+        }
+
         const isAvailable = await this.checkAvailability(newDate, newTime);
         if (!isAvailable) {
           throw new ConflictException('Horário não está disponível');

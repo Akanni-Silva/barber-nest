@@ -1,18 +1,18 @@
 /* eslint-disable @typescript-eslint/restrict-template-expressions */
-
+// src/schedule/services/schedule.service.ts
 import {
   Injectable,
   NotFoundException,
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, In } from 'typeorm'; // ✅ Adicionar In
+import { Repository, Between, In } from 'typeorm';
 
 import { WorkSchedule } from '../entities/work-schedule.entity';
 import { BlockedDate } from '../entities/blocked-date.entity';
 import { SpecialHours } from '../entities/special-hours.entity';
 import { BreakTime } from '../entities/break-time.entity';
-import { Appointment } from '../../appointments/entities/appointment.entity'; // ✅ Importar Appointment
+import { Appointment } from '../../appointments/entities/appointment.entity';
 import { CreateWorkScheduleDto } from '../dto/create-work-schedule.dto';
 import { UpdateWorkScheduleDto } from '../dto/update-work-schedule.dto';
 import { CreateBlockedDateDto } from '../dto/create-blocked-date.dto';
@@ -30,7 +30,7 @@ export class ScheduleService {
     private specialHoursRepository: Repository<SpecialHours>,
     @InjectRepository(BreakTime)
     private breakTimeRepository: Repository<BreakTime>,
-    @InjectRepository(Appointment) // ✅ INJETAR Appointment
+    @InjectRepository(Appointment)
     private appointmentRepository: Repository<Appointment>,
   ) {}
 
@@ -271,7 +271,6 @@ export class ScheduleService {
     lunch_end?: string;
     reason?: string;
   }> {
-    // 1. Verificar se é feriado ou dia bloqueado
     const isBlocked = await this.blockedDateRepository.findOne({
       where: { blocked_date: date, is_full_day: true },
     });
@@ -280,7 +279,6 @@ export class ScheduleService {
       return { is_working: false, reason: isBlocked.reason };
     }
 
-    // 2. Verificar horário especial
     const special = await this.specialHoursRepository.findOne({
       where: { special_date: date, is_active: true },
     });
@@ -294,7 +292,6 @@ export class ScheduleService {
       };
     }
 
-    // 3. Buscar horário padrão da semana
     const dayOfWeek = date.getDay();
     const schedule = await this.workScheduleRepository.findOne({
       where: { day_of_week: dayOfWeek, is_working: true },
@@ -315,7 +312,9 @@ export class ScheduleService {
   }
 
   /**
-   * ✅ Gerar slots disponíveis para uma data (CORRIGIDO)
+   * ✅ Gerar slots disponíveis para uma data
+   * - Remove horários ocupados (pending e confirmed)
+   * - Remove horários que já passaram (para hoje)
    */
   async generateAvailableSlots(
     date: Date,
@@ -331,38 +330,41 @@ export class ScheduleService {
       return [];
     }
 
-    // Buscar pausas do dia
     const breaks = await this.findBreaksByDate(date);
 
-    // ✅ Buscar agendamentos ocupados (pending E confirmed)
+    // ✅ Buscar agendamentos ocupados (pending e confirmed)
     const existingAppointments = await this.appointmentRepository.find({
       where: {
         appointment_date: date,
-        status: In(['confirmed', 'pending']), // ✅ Inclui pending
+        status: In(['confirmed', 'pending']),
       },
     });
 
-    // ✅ Criar conjunto de horários ocupados
     const busyTimes = new Set(
       existingAppointments.map((a) => a.appointment_time),
     );
 
+    // ✅ Hora atual para verificar horários passados (apenas para hoje)
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const currentTime = now.toTimeString().slice(0, 5);
+
     const slots: string[] = [];
-    let currentTime = workingHours.start_time;
+    let currentTimeSlot = workingHours.start_time;
     const endTime = workingHours.end_time;
     const slotDuration = workingHours.slot_duration || 30;
 
     while (
-      this.timeToMinutes(currentTime) + serviceDuration <=
+      this.timeToMinutes(currentTimeSlot) + serviceDuration <=
       this.timeToMinutes(endTime)
     ) {
       // Verificar horário de almoço
       if (workingHours.lunch_start && workingHours.lunch_end) {
         if (
-          currentTime >= workingHours.lunch_start &&
-          currentTime < workingHours.lunch_end
+          currentTimeSlot >= workingHours.lunch_start &&
+          currentTimeSlot < workingHours.lunch_end
         ) {
-          currentTime = workingHours.lunch_end;
+          currentTimeSlot = workingHours.lunch_end;
           continue;
         }
       }
@@ -371,10 +373,10 @@ export class ScheduleService {
       let isBreak = false;
       for (const breakItem of breaks) {
         if (
-          currentTime >= breakItem.start_time &&
-          currentTime < breakItem.end_time
+          currentTimeSlot >= breakItem.start_time &&
+          currentTimeSlot < breakItem.end_time
         ) {
-          currentTime = breakItem.end_time;
+          currentTimeSlot = breakItem.end_time;
           isBreak = true;
           break;
         }
@@ -383,11 +385,18 @@ export class ScheduleService {
       if (isBreak) continue;
 
       // ✅ Pular horários ocupados
-      if (!busyTimes.has(currentTime)) {
-        slots.push(currentTime);
+      if (!busyTimes.has(currentTimeSlot)) {
+        // ✅ Verificar se o horário é no futuro (para data de hoje)
+        const isPastSlot =
+          date.toISOString().split('T')[0] === todayStr &&
+          currentTimeSlot < currentTime;
+
+        if (!isPastSlot) {
+          slots.push(currentTimeSlot);
+        }
       }
 
-      currentTime = this.addMinutes(currentTime, slotDuration);
+      currentTimeSlot = this.addMinutes(currentTimeSlot, slotDuration);
     }
 
     return slots;

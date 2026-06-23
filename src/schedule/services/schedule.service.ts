@@ -1,17 +1,18 @@
 /* eslint-disable @typescript-eslint/restrict-template-expressions */
-// src/schedule/services/schedule.service.ts
+
 import {
   Injectable,
   NotFoundException,
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between } from 'typeorm'; // ✅ Adicionar Between aqui
+import { Repository, Between, In } from 'typeorm'; // ✅ Adicionar In
 
 import { WorkSchedule } from '../entities/work-schedule.entity';
 import { BlockedDate } from '../entities/blocked-date.entity';
 import { SpecialHours } from '../entities/special-hours.entity';
 import { BreakTime } from '../entities/break-time.entity';
+import { Appointment } from '../../appointments/entities/appointment.entity'; // ✅ Importar Appointment
 import { CreateWorkScheduleDto } from '../dto/create-work-schedule.dto';
 import { UpdateWorkScheduleDto } from '../dto/update-work-schedule.dto';
 import { CreateBlockedDateDto } from '../dto/create-blocked-date.dto';
@@ -29,6 +30,8 @@ export class ScheduleService {
     private specialHoursRepository: Repository<SpecialHours>,
     @InjectRepository(BreakTime)
     private breakTimeRepository: Repository<BreakTime>,
+    @InjectRepository(Appointment) // ✅ INJETAR Appointment
+    private appointmentRepository: Repository<Appointment>,
   ) {}
 
   // ==================== WORK SCHEDULE ====================
@@ -311,6 +314,9 @@ export class ScheduleService {
     };
   }
 
+  /**
+   * ✅ Gerar slots disponíveis para uma data (CORRIGIDO)
+   */
   async generateAvailableSlots(
     date: Date,
     serviceDuration: number = 30,
@@ -321,13 +327,25 @@ export class ScheduleService {
       return [];
     }
 
-    // ✅ Garantir que os valores existem
     if (!workingHours.start_time || !workingHours.end_time) {
       return [];
     }
 
     // Buscar pausas do dia
     const breaks = await this.findBreaksByDate(date);
+
+    // ✅ Buscar agendamentos ocupados (pending E confirmed)
+    const existingAppointments = await this.appointmentRepository.find({
+      where: {
+        appointment_date: date,
+        status: In(['confirmed', 'pending']), // ✅ Inclui pending
+      },
+    });
+
+    // ✅ Criar conjunto de horários ocupados
+    const busyTimes = new Set(
+      existingAppointments.map((a) => a.appointment_time),
+    );
 
     const slots: string[] = [];
     let currentTime = workingHours.start_time;
@@ -364,7 +382,11 @@ export class ScheduleService {
 
       if (isBreak) continue;
 
-      slots.push(currentTime);
+      // ✅ Pular horários ocupados
+      if (!busyTimes.has(currentTime)) {
+        slots.push(currentTime);
+      }
+
       currentTime = this.addMinutes(currentTime, slotDuration);
     }
 
@@ -373,7 +395,7 @@ export class ScheduleService {
 
   async setupDefaultSchedule(): Promise<void> {
     const defaultSchedules = [
-      { day_of_week: 0, is_working: false }, // ✅ sem start_time/end_time
+      { day_of_week: 0, is_working: false },
       {
         day_of_week: 1,
         is_working: true,

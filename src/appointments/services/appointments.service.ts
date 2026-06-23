@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 // src/appointments/services/appointments.service.ts
 import {
@@ -8,7 +7,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, MoreThan } from 'typeorm';
+import { Repository, Between, MoreThan, In } from 'typeorm';
 import { Appointment } from '../entities/appointment.entity';
 import { CreateAppointmentDto } from '../dto/create-appointment.dto';
 import { UpdateAppointmentDto } from '../dto/update-appointment.dto';
@@ -28,7 +27,7 @@ export class AppointmentsService {
    * Criar um novo agendamento
    */
   async create(createDto: CreateAppointmentDto): Promise<Appointment> {
-    // 1. Buscar ou criar cliente (client_name e client_phone do DTO)
+    // 1. Buscar ou criar cliente
     const client = await this.clientsService.findOrCreate({
       name: createDto.client_name,
       phone: createDto.client_phone,
@@ -42,7 +41,7 @@ export class AppointmentsService {
       );
     }
 
-    // 3. Verificar disponibilidade do horário
+    // 3. ✅ Verificar disponibilidade do horário (com pending)
     const isAvailable = await this.checkAvailability(
       createDto.appointment_date,
       createDto.appointment_time,
@@ -52,12 +51,12 @@ export class AppointmentsService {
       throw new ConflictException('Horário não está mais disponível');
     }
 
-    // 4. Criar agendamento - SEM client_name e client_phone
+    // 4. Criar agendamento
     const appointment = this.appointmentRepository.create({
-      client: client, // ✅ Objeto Client completo
-      client_id: client.id, // ✅ FK
-      service: service, // ✅ Objeto Service completo
-      service_id: service.id, // ✅ FK
+      client: client,
+      client_id: client.id,
+      service: service,
+      service_id: service.id,
       appointment_date: createDto.appointment_date,
       appointment_time: createDto.appointment_time,
       notes: createDto.notes,
@@ -122,8 +121,8 @@ export class AppointmentsService {
     const appointment = await this.appointmentRepository.findOne({
       where: { id },
       relations: {
-        client: true, // ✅ Forma correta para TypeORM
-        service: true, // ✅ Forma correta para TypeORM
+        client: true,
+        service: true,
       },
     });
 
@@ -139,7 +138,7 @@ export class AppointmentsService {
    */
   async findByClient(clientId: number): Promise<Appointment[]> {
     return await this.appointmentRepository.find({
-      where: { client: { id: clientId } }, // ✅ Forma correta
+      where: { client: { id: clientId } },
       relations: {
         service: true,
       },
@@ -200,7 +199,7 @@ export class AppointmentsService {
   }
 
   /**
-   * Confirmar agendamento (via WhatsApp)
+   * ✅ Confirmar agendamento
    */
   async confirm(id: number): Promise<Appointment> {
     const appointment = await this.findById(id);
@@ -214,11 +213,14 @@ export class AppointmentsService {
     appointment.status = 'confirmed';
     const updated = await this.appointmentRepository.save(appointment);
 
+    // ✅ Garantir que o preço é um número
+    const price =
+      typeof appointment.service.price === 'string'
+        ? parseFloat(appointment.service.price)
+        : appointment.service.price;
+
     // Atualizar estatísticas do cliente
-    await this.clientsService.updateStats(
-      appointment.client.id,
-      appointment.service.price,
-    );
+    await this.clientsService.updateStats(appointment.client.id, price);
 
     return updated;
   }
@@ -260,14 +262,15 @@ export class AppointmentsService {
   }
 
   /**
-   * Verificar disponibilidade de horário
+   * ✅ Verificar disponibilidade de horário
+   * CORRIGIDO: Verificar 'confirmed' e 'pending'
    */
   private async checkAvailability(date: Date, time: string): Promise<boolean> {
     const existing = await this.appointmentRepository.findOne({
       where: {
         appointment_date: date,
         appointment_time: time,
-        status: 'confirmed',
+        status: In(['confirmed', 'pending']), // ✅ Inclui pending
       },
     });
 
@@ -290,7 +293,7 @@ export class AppointmentsService {
       );
     }
 
-    // Verificar disponibilidade do novo horário
+    // ✅ Verificar disponibilidade do novo horário
     const isAvailable = await this.checkAvailability(newDate, newTime);
     if (!isAvailable) {
       throw new ConflictException('Horário não está disponível');
@@ -298,7 +301,7 @@ export class AppointmentsService {
 
     appointment.appointment_date = newDate;
     appointment.appointment_time = newTime;
-    appointment.status = 'pending'; // Volta para pending após reagendamento
+    appointment.status = 'pending';
 
     return await this.appointmentRepository.save(appointment);
   }
@@ -321,7 +324,6 @@ export class AppointmentsService {
       where: { status: 'cancelled' },
     });
 
-    // Receita total de agendamentos concluídos
     const revenueResult = await this.appointmentRepository
       .createQueryBuilder('appointment')
       .leftJoin('appointment.service', 'service')
@@ -335,6 +337,7 @@ export class AppointmentsService {
       confirmed,
       completed,
       cancelled,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       total_revenue: revenueResult?.total || 0,
     };
   }
@@ -357,6 +360,9 @@ export class AppointmentsService {
     await this.appointmentRepository.remove(appointment);
   }
 
+  /**
+   * Atualizar agendamento
+   */
   async update(
     id: number,
     updateDto: UpdateAppointmentDto,
@@ -375,7 +381,6 @@ export class AppointmentsService {
       const newTime =
         updateDto.appointment_time || appointment.appointment_time;
 
-      // Verificar disponibilidade apenas se data/hora mudarem
       if (
         newDate !== appointment.appointment_date ||
         newTime !== appointment.appointment_time

@@ -1,4 +1,5 @@
-// src/schedule/services/schedule.service.ts
+/* eslint-disable @typescript-eslint/restrict-template-expressions */
+
 import {
   Injectable,
   NotFoundException,
@@ -311,48 +312,34 @@ export class ScheduleService {
   }
 
   /**
-   * Gerar slots disponíveis para uma data (COM LOGS PARA DEBUG)
+   * Gerar slots disponíveis para uma data
    */
   async generateAvailableSlots(
     date: Date,
     serviceDuration: number = 30,
   ): Promise<string[]> {
-    console.log('🔍 generateAvailableSlots chamado para:', date);
-
     const workingHours = await this.getWorkingHoursForDate(date);
-    console.log('📊 workingHours:', workingHours);
 
     if (!workingHours.is_working) {
-      console.log('❌ Dia não está trabalhando');
       return [];
     }
 
     if (!workingHours.start_time || !workingHours.end_time) {
-      console.log('❌ start_time ou end_time ausentes');
       return [];
     }
 
-    console.log(
-      `✅ Horário de trabalho: ${workingHours.start_time} - ${workingHours.end_time}`,
-    );
-
-    // Buscar pausas do dia
     const breaks = await this.findBreaksByDate(date);
-    console.log('📊 Pausas do dia:', breaks);
 
-    // Buscar agendamentos ocupados
     const existingAppointments = await this.appointmentRepository.find({
       where: {
         appointment_date: date,
         status: In(['confirmed', 'pending']),
       },
     });
-    console.log('📊 Agendamentos ocupados:', existingAppointments);
 
     const busyTimes = new Set(
       existingAppointments.map((a) => a.appointment_time),
     );
-    console.log('📊 Horários ocupados:', Array.from(busyTimes));
 
     const now = new Date();
     const todayStr = now.toISOString().split('T')[0];
@@ -363,15 +350,10 @@ export class ScheduleService {
     const endTime = workingHours.end_time;
     const slotDuration = workingHours.slot_duration || 30;
 
-    console.log(
-      `🔄 Gerando slots de ${currentTimeSlot} até ${endTime} com duração de ${slotDuration}min`,
-    );
-
     while (
       this.timeToMinutes(currentTimeSlot) + serviceDuration <=
       this.timeToMinutes(endTime)
     ) {
-      // Verificar horário de almoço
       if (workingHours.lunch_start && workingHours.lunch_end) {
         if (
           currentTimeSlot >= workingHours.lunch_start &&
@@ -382,7 +364,6 @@ export class ScheduleService {
         }
       }
 
-      // Verificar pausas
       let isBreak = false;
       for (const breakItem of breaks) {
         if (
@@ -397,27 +378,19 @@ export class ScheduleService {
 
       if (isBreak) continue;
 
-      // Pular horários ocupados
       if (!busyTimes.has(currentTimeSlot)) {
-        // Verificar se o horário é no futuro (apenas para hoje)
         const isPastSlot =
           date.toISOString().split('T')[0] === todayStr &&
           currentTimeSlot < currentTime;
 
         if (!isPastSlot) {
           slots.push(currentTimeSlot);
-          console.log(`✅ Slot adicionado: ${currentTimeSlot}`);
-        } else {
-          console.log(`⏰ Horário passado ignorado: ${currentTimeSlot}`);
         }
-      } else {
-        console.log(`❌ Horário ocupado ignorado: ${currentTimeSlot}`);
       }
 
       currentTimeSlot = this.addMinutes(currentTimeSlot, slotDuration);
     }
 
-    console.log(`📋 Total de slots gerados: ${slots.length}`, slots);
     return slots;
   }
 

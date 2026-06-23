@@ -8,13 +8,13 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
-  Unique, // ✅ Importar Unique
+  Unique,
 } from 'typeorm';
 import { Product } from '../../products/entities/product.entity';
 import { Client } from '../../clients/entities/client.entity';
 
 @Entity('appointments')
-@Unique(['appointment_date', 'appointment_time']) // ✅ Impedir duplicatas de data/hora
+@Unique(['appointment_date', 'appointment_time'])
 export class Appointment {
   @ApiProperty()
   @PrimaryGeneratedColumn()

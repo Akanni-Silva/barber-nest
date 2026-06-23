@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/restrict-template-expressions */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-
 import {
   ConflictException,
   Injectable,
@@ -27,16 +27,31 @@ export class AppointmentsService {
   ) {}
 
   /**
-   * ✅ Criar um novo agendamento com TRANSAÇÃO E LOCK
+   * ✅ Criar um novo agendamento com validação completa
    */
   async create(createDto: CreateAppointmentDto): Promise<Appointment> {
-    // 1. Buscar ou criar cliente
+    // 1. Validar dados obrigatórios
+    if (!createDto.client_name || !createDto.client_phone) {
+      throw new BadRequestException(
+        'Nome e telefone do cliente são obrigatórios',
+      );
+    }
+
+    if (!createDto.service_id) {
+      throw new BadRequestException('ID do serviço é obrigatório');
+    }
+
+    if (!createDto.appointment_date || !createDto.appointment_time) {
+      throw new BadRequestException('Data e horário são obrigatórios');
+    }
+
+    // 2. Buscar ou criar cliente
     const client = await this.clientsService.findOrCreate({
       name: createDto.client_name,
       phone: createDto.client_phone,
     });
 
-    // 2. Verificar se serviço existe
+    // 3. Verificar se serviço existe
     const service = await this.productsService.findById(createDto.service_id);
     if (!service) {
       throw new NotFoundException(
@@ -44,43 +59,66 @@ export class AppointmentsService {
       );
     }
 
-    // ✅ 3. Validar formato do horário
-    const timeParts = createDto.appointment_time.split(':');
-    if (timeParts.length < 2) {
+    // 4. Validar formato da data
+    let appointmentDate: Date;
+    try {
+      appointmentDate = new Date(createDto.appointment_date);
+      if (isNaN(appointmentDate.getTime())) {
+        throw new Error('Data inválida');
+      }
+    } catch {
       throw new BadRequestException(
-        'Formato de horário inválido. Use HH:mm ou HH:mm:ss',
+        `Formato de data inválido: ${createDto.appointment_date}`,
       );
     }
 
-    // ✅ Garantir que o horário tenha segundos (HH:mm:ss)
+    // 5. Validar formato do horário
+    const timeParts = createDto.appointment_time.split(':');
+    if (timeParts.length < 2) {
+      throw new BadRequestException(
+        `Formato de horário inválido: ${createDto.appointment_time}. Use HH:mm ou HH:mm:ss`,
+      );
+    }
+
+    // Garantir que o horário tenha segundos (HH:mm:ss)
     let formattedTime = createDto.appointment_time;
     if (timeParts.length === 2) {
       formattedTime = `${createDto.appointment_time}:00`;
     }
 
-    // ✅ 4. Validar se a data/hora é no futuro
-    const now = new Date();
-    const appointmentDate = new Date(createDto.appointment_date);
+    // Validar se horas e minutos são números válidos
     const [hours, minutes] = formattedTime.split(':').map(Number);
+    if (
+      isNaN(hours) ||
+      isNaN(minutes) ||
+      hours < 0 ||
+      hours > 23 ||
+      minutes < 0 ||
+      minutes > 59
+    ) {
+      throw new BadRequestException(`Horário inválido: ${formattedTime}`);
+    }
+
+    // 6. Validar se a data/hora é no futuro
+    const now = new Date();
     appointmentDate.setHours(hours, minutes, 0, 0);
 
     const appointmentTimestamp = appointmentDate.getTime();
     const nowTimestamp = now.getTime();
 
-    // ✅ Verificar se é no futuro (com margem de 1 minuto)
     if (appointmentTimestamp < nowTimestamp - 60000) {
       throw new BadRequestException(
         `Não é possível agendar para um horário que já passou (${formattedTime})`,
       );
     }
 
-    // ✅ 5. Usar transação com lock pessimista
+    // 7. Usar transação com lock pessimista
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-      // ✅ 6. Verificar disponibilidade com LOCK (FOR UPDATE)
+      // 8. Verificar disponibilidade com LOCK (FOR UPDATE)
       const existing = await queryRunner.manager
         .createQueryBuilder(Appointment, 'appointment')
         .where(
@@ -100,17 +138,16 @@ export class AppointmentsService {
         throw new ConflictException('Horário não está mais disponível');
       }
 
-      // 7. Criar agendamento
-      const appointment = queryRunner.manager.create(Appointment, {
-        client: client,
-        client_id: client.id,
-        service: service,
-        service_id: service.id,
-        appointment_date: createDto.appointment_date,
-        appointment_time: formattedTime,
-        notes: createDto.notes,
-        status: 'pending',
-      });
+      // 9. Criar agendamento - FORMA CORRETA
+      const appointment = new Appointment();
+      appointment.client = client;
+      appointment.client_id = client.id;
+      appointment.service = service;
+      appointment.service_id = service.id;
+      appointment.appointment_date = createDto.appointment_date;
+      appointment.appointment_time = formattedTime;
+      appointment.notes = createDto.notes || '';
+      appointment.status = 'pending';
 
       const savedAppointment = await queryRunner.manager.save(appointment);
       await queryRunner.commitTransaction();

@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
+// src/clients/services/clients.service.ts
 import {
   Injectable,
   NotFoundException,
@@ -23,7 +24,6 @@ export class ClientsService {
    * Criar um novo cliente
    */
   async create(createClientDto: CreateClientDto): Promise<Client> {
-    // Verificar se telefone já existe
     const existingClient = await this.clientRepository.findOne({
       where: { phone: createClientDto.phone },
     });
@@ -44,13 +44,11 @@ export class ClientsService {
   async findOrCreate(createClientDto: CreateClientDto): Promise<Client> {
     const { phone } = createClientDto;
 
-    // Buscar cliente existente
     let client = await this.clientRepository.findOne({
       where: { phone },
     });
 
     if (client) {
-      // Atualizar nome se veio diferente e está vazio no banco
       if (
         client.name !== createClientDto.name &&
         (!client.name || client.name === '')
@@ -61,7 +59,6 @@ export class ClientsService {
       return client;
     }
 
-    // Criar novo cliente
     client = this.clientRepository.create(createClientDto);
     return await this.clientRepository.save(client);
   }
@@ -156,7 +153,6 @@ export class ClientsService {
   async update(id: number, updateClientDto: UpdateClientDto): Promise<Client> {
     const client = await this.findById(id);
 
-    // Se estiver atualizando telefone, verificar se já existe
     if (updateClientDto.phone && updateClientDto.phone !== client.phone) {
       const existingClient = await this.clientRepository.findOne({
         where: { phone: updateClientDto.phone },
@@ -173,13 +169,36 @@ export class ClientsService {
   }
 
   /**
-   * Atualizar estatísticas do cliente após um agendamento
+   * ✅ Atualizar estatísticas do cliente após um agendamento
+   * CORRIGIDO: Garantir que o valor seja um número válido
    */
   async updateStats(id: number, appointmentValue: number): Promise<void> {
     const client = await this.findById(id);
 
+    // ✅ Garantir que o valor é um número
+    let numericValue: number;
+
+    if (typeof appointmentValue === 'string') {
+      const cleanValue = String(appointmentValue)
+        .replace(/[^0-9.,]/g, '')
+        .replace(',', '.');
+      numericValue = parseFloat(cleanValue);
+    } else if (typeof appointmentValue === 'number') {
+      numericValue = appointmentValue;
+    } else {
+      numericValue = Number(appointmentValue);
+    }
+
+    // ✅ Verificar se é um número válido
+    if (isNaN(numericValue) || numericValue <= 0) {
+      console.warn(
+        `⚠️ Valor inválido para updateStats: ${appointmentValue}. Usando 0.`,
+      );
+      numericValue = 0;
+    }
+
     client.total_appointments += 1;
-    client.total_spent += appointmentValue;
+    client.total_spent += numericValue;
     client.last_visit = new Date();
 
     await this.clientRepository.save(client);
@@ -272,7 +291,6 @@ export class ClientsService {
   async getAppointmentHistory(id: number) {
     const client = await this.findById(id);
 
-    // Ordenar agendamentos do mais recente para o mais antigo
     const history = client.appointments.sort(
       (a, b) =>
         new Date(b.appointment_date).getTime() -
@@ -394,7 +412,6 @@ export class ClientsService {
   async delete(id: number): Promise<void> {
     const client = await this.findById(id);
 
-    // Verificar se cliente tem agendamentos futuros
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 

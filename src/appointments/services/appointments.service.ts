@@ -1,544 +1,555 @@
-/* eslint-disable @typescript-eslint/restrict-template-expressions */
-/* eslint-disable @typescript-eslint/no-redundant-type-constituents */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-// src/schedule/services/schedule.service.ts
+// src/appointments/services/appointments.service.ts
 import {
+  ConflictException,
   Injectable,
   NotFoundException,
-  ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, In } from 'typeorm';
-import { WorkSchedule } from '../../schedule/entities/work-schedule.entity';
-import { BlockedDate } from '../../schedule/entities/blocked-date.entity';
-import { SpecialHours } from '../../schedule/entities/special-hours.entity';
-import { BreakTime } from '../../schedule/entities/break-time.entity';
+import { Repository, Between, MoreThan, In, DataSource } from 'typeorm';
 import { Appointment } from '../entities/appointment.entity';
-import { CreateWorkScheduleDto } from '../../schedule/dto/create-work-schedule.dto';
-import { UpdateWorkScheduleDto } from '../../schedule/dto/update-work-schedule.dto';
-import { CreateBlockedDateDto } from '../../schedule/dto/create-blocked-date.dto';
-import { CreateSpecialHoursDto } from '../../schedule/dto/create-special-hours.dto';
-import { CreateBreakTimeDto } from '../../schedule/dto/create-break-time.dto';
+import { CreateAppointmentDto } from '../dto/create-appointment.dto';
+import { UpdateAppointmentDto } from '../dto/update-appointment.dto';
+import { ClientsService } from '../../clients/services/clients.service';
+import { ProductsService } from '../../products/services/products.service';
 
 @Injectable()
-export class ScheduleService {
+export class AppointmentsService {
   constructor(
-    @InjectRepository(WorkSchedule)
-    private workScheduleRepository: Repository<WorkSchedule>,
-    @InjectRepository(BlockedDate)
-    private blockedDateRepository: Repository<BlockedDate>,
-    @InjectRepository(SpecialHours)
-    private specialHoursRepository: Repository<SpecialHours>,
-    @InjectRepository(BreakTime)
-    private breakTimeRepository: Repository<BreakTime>,
     @InjectRepository(Appointment)
     private appointmentRepository: Repository<Appointment>,
+    private clientsService: ClientsService,
+    private productsService: ProductsService,
+    private dataSource: DataSource,
   ) {}
 
-  // ==================== WORK SCHEDULE ====================
-
-  async upsertWorkSchedule(
-    createDto: CreateWorkScheduleDto,
-  ): Promise<WorkSchedule> {
-    const existing = await this.workScheduleRepository.findOne({
-      where: { day_of_week: createDto.day_of_week },
-    });
-
-    if (existing) {
-      Object.assign(existing, createDto);
-      return await this.workScheduleRepository.save(existing);
+  /**
+   * ✅ Criar um novo agendamento com validação CORRETA
+   */
+  async create(createDto: CreateAppointmentDto): Promise<Appointment> {
+    // 1. Validar dados obrigatórios
+    if (!createDto.client_name || !createDto.client_phone) {
+      throw new BadRequestException(
+        'Nome e telefone do cliente são obrigatórios',
+      );
     }
 
-    const schedule = this.workScheduleRepository.create(createDto);
-    return await this.workScheduleRepository.save(schedule);
-  }
+    if (!createDto.service_id) {
+      throw new BadRequestException('ID do serviço é obrigatório');
+    }
 
-  async findWorkScheduleByDay(dayOfWeek: number): Promise<WorkSchedule> {
-    const schedule = await this.workScheduleRepository.findOne({
-      where: { day_of_week: dayOfWeek },
+    if (!createDto.appointment_date || !createDto.appointment_time) {
+      throw new BadRequestException('Data e horário são obrigatórios');
+    }
+
+    // 2. Buscar ou criar cliente
+    const client = await this.clientsService.findOrCreate({
+      name: createDto.client_name,
+      phone: createDto.client_phone,
     });
 
-    if (!schedule) {
+    // 3. Verificar se serviço existe
+    const service = await this.productsService.findById(createDto.service_id);
+    if (!service) {
       throw new NotFoundException(
-        `Horário para o dia ${dayOfWeek} não encontrado`,
+        `Serviço com ID ${createDto.service_id} não encontrado`,
       );
     }
 
-    return schedule;
+    // 4. Validar formato do horário
+    const timeParts = createDto.appointment_time.split(':');
+    if (timeParts.length < 2) {
+      throw new BadRequestException(
+        `Formato de horário inválido: ${createDto.appointment_time}. Use HH:mm ou HH:mm:ss`,
+      );
+    }
+
+    // Garantir que o horário tenha segundos (HH:mm:ss)
+    let formattedTime = createDto.appointment_time;
+    if (timeParts.length === 2) {
+      formattedTime = `${createDto.appointment_time}:00`;
+    }
+
+    // Validar se horas e minutos são números válidos
+    const [hours, minutes] = formattedTime.split(':').map(Number);
+    if (
+      isNaN(hours) ||
+      isNaN(minutes) ||
+      hours < 0 ||
+      hours > 23 ||
+      minutes < 0 ||
+      minutes > 59
+    ) {
+      throw new BadRequestException(`Horário inválido: ${formattedTime}`);
+    }
+
+    // ✅ 5. Validar se a data/hora é no futuro (APENAS PARA HOJE)
+    const now = new Date();
+    const appointmentDate = new Date(createDto.appointment_date);
+    appointmentDate.setHours(hours, minutes, 0, 0);
+
+    // ✅ Verificar se a data do agendamento é hoje
+    const todayStr = now.toISOString().split('T')[0];
+    const appointmentDateStr = new Date(createDto.appointment_date)
+      .toISOString()
+      .split('T')[0];
+
+    // ✅ Só validar horário passado se for o dia atual
+    if (appointmentDateStr === todayStr) {
+      const diffMinutes = (appointmentDate.getTime() - now.getTime()) / 60000;
+      if (diffMinutes < -2) {
+        throw new BadRequestException(
+          `Não é possível agendar para um horário que já passou (${formattedTime})`,
+        );
+      }
+    }
+
+    // 6. Usar transação com lock pessimista
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // 7. Verificar disponibilidade com LOCK (FOR UPDATE)
+      const existing = await queryRunner.manager
+        .createQueryBuilder(Appointment, 'appointment')
+        .where(
+          'appointment.appointment_date = :date AND appointment.appointment_time = :time',
+          {
+            date: createDto.appointment_date,
+            time: formattedTime,
+          },
+        )
+        .andWhere('appointment.status IN (:...statuses)', {
+          statuses: ['pending', 'confirmed'],
+        })
+        .setLock('pessimistic_write')
+        .getOne();
+
+      if (existing) {
+        throw new ConflictException('Horário não está mais disponível');
+      }
+
+      // 8. Criar agendamento
+      const appointment = new Appointment();
+      appointment.client = client;
+      appointment.client_id = client.id;
+      appointment.service = service;
+      appointment.service_id = service.id;
+      appointment.appointment_date = createDto.appointment_date;
+      appointment.appointment_time = formattedTime;
+      appointment.notes = createDto.notes || '';
+      appointment.status = 'pending';
+
+      const savedAppointment = await queryRunner.manager.save(appointment);
+      await queryRunner.commitTransaction();
+
+      return savedAppointment;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
-  async findAllWorkSchedules(): Promise<WorkSchedule[]> {
-    return await this.workScheduleRepository.find({
-      order: { day_of_week: 'ASC' },
-    });
+  /**
+   * Buscar todos agendamentos (com filtros)
+   */
+  async findAll(filters?: {
+    status?: string;
+    startDate?: Date;
+    endDate?: Date;
+    page?: number;
+    limit?: number;
+  }): Promise<{ appointments: Appointment[]; total: number }> {
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 20;
+    const skip = (page - 1) * limit;
+
+    const query = this.appointmentRepository
+      .createQueryBuilder('appointment')
+      .leftJoinAndSelect('appointment.client', 'client')
+      .leftJoinAndSelect('appointment.service', 'service');
+
+    if (filters?.status) {
+      query.andWhere('appointment.status = :status', {
+        status: filters.status,
+      });
+    }
+
+    if (filters?.startDate) {
+      query.andWhere('appointment.appointment_date >= :startDate', {
+        startDate: filters.startDate,
+      });
+    }
+
+    if (filters?.endDate) {
+      query.andWhere('appointment.appointment_date <= :endDate', {
+        endDate: filters.endDate,
+      });
+    }
+
+    query
+      .orderBy('appointment.appointment_date', 'ASC')
+      .addOrderBy('appointment.appointment_time', 'ASC')
+      .skip(skip)
+      .take(limit);
+
+    const [appointments, total] = await query.getManyAndCount();
+
+    return { appointments, total };
   }
 
-  async updateWorkSchedule(
-    id: number,
-    updateDto: UpdateWorkScheduleDto,
-  ): Promise<WorkSchedule> {
-    const schedule = await this.workScheduleRepository.findOne({
+  /**
+   * Buscar agendamento por ID
+   */
+  async findById(id: number): Promise<Appointment> {
+    const appointment = await this.appointmentRepository.findOne({
       where: { id },
-    });
-
-    if (!schedule) {
-      throw new NotFoundException(
-        `Horário de trabalho com ID ${id} não encontrado`,
-      );
-    }
-
-    Object.assign(schedule, updateDto);
-    return await this.workScheduleRepository.save(schedule);
-  }
-
-  async deleteWorkSchedule(id: number): Promise<void> {
-    const schedule = await this.workScheduleRepository.findOne({
-      where: { id },
-    });
-
-    if (!schedule) {
-      throw new NotFoundException(
-        `Horário de trabalho com ID ${id} não encontrado`,
-      );
-    }
-
-    await this.workScheduleRepository.remove(schedule);
-  }
-
-  // ==================== BLOCKED DATES ====================
-
-  async blockDate(createDto: CreateBlockedDateDto): Promise<BlockedDate> {
-    const existing = await this.blockedDateRepository.findOne({
-      where: { blocked_date: createDto.blocked_date },
-    });
-
-    if (existing) {
-      throw new ConflictException(
-        `Data ${createDto.blocked_date} já está bloqueada`,
-      );
-    }
-
-    const blockedDate = this.blockedDateRepository.create(createDto);
-    return await this.blockedDateRepository.save(blockedDate);
-  }
-
-  async findAllBlockedDates(
-    startDate?: Date,
-    endDate?: Date,
-  ): Promise<BlockedDate[]> {
-    const query = this.blockedDateRepository
-      .createQueryBuilder('blocked_date')
-      .orderBy('blocked_date.blocked_date', 'ASC');
-
-    if (startDate) {
-      query.andWhere('blocked_date.blocked_date >= :startDate', { startDate });
-    }
-
-    if (endDate) {
-      query.andWhere('blocked_date.blocked_date <= :endDate', { endDate });
-    }
-
-    return await query.getMany();
-  }
-
-  async isDateBlocked(date: Date): Promise<boolean> {
-    const blocked = await this.blockedDateRepository.findOne({
-      where: { blocked_date: date },
-    });
-    return !!blocked;
-  }
-
-  async unblockDate(id: number): Promise<void> {
-    const blocked = await this.blockedDateRepository.findOne({
-      where: { id },
-    });
-
-    if (!blocked) {
-      throw new NotFoundException(`Data bloqueada com ID ${id} não encontrada`);
-    }
-
-    await this.blockedDateRepository.remove(blocked);
-  }
-
-  // ==================== SPECIAL HOURS ====================
-
-  async createSpecialHours(
-    createDto: CreateSpecialHoursDto,
-  ): Promise<SpecialHours> {
-    const existing = await this.specialHoursRepository.findOne({
-      where: { special_date: createDto.special_date },
-    });
-
-    if (existing) {
-      throw new ConflictException(
-        `Horário especial para data ${createDto.special_date} já existe`,
-      );
-    }
-
-    const specialHours = this.specialHoursRepository.create(createDto);
-    return await this.specialHoursRepository.save(specialHours);
-  }
-
-  async findAllSpecialHours(): Promise<SpecialHours[]> {
-    return await this.specialHoursRepository.find({
-      order: { special_date: 'ASC' },
-    });
-  }
-
-  async findSpecialHoursByDate(date: Date): Promise<SpecialHours | null> {
-    return await this.specialHoursRepository.findOne({
-      where: { special_date: date, is_active: true },
-    });
-  }
-
-  async updateSpecialHours(
-    id: number,
-    updateDto: Partial<CreateSpecialHoursDto>,
-  ): Promise<SpecialHours> {
-    const specialHours = await this.specialHoursRepository.findOne({
-      where: { id },
-    });
-
-    if (!specialHours) {
-      throw new NotFoundException(
-        `Horário especial com ID ${id} não encontrado`,
-      );
-    }
-
-    Object.assign(specialHours, updateDto);
-    return await this.specialHoursRepository.save(specialHours);
-  }
-
-  async deleteSpecialHours(id: number): Promise<void> {
-    const specialHours = await this.specialHoursRepository.findOne({
-      where: { id },
-    });
-
-    if (!specialHours) {
-      throw new NotFoundException(
-        `Horário especial com ID ${id} não encontrado`,
-      );
-    }
-
-    await this.specialHoursRepository.remove(specialHours);
-  }
-
-  // ==================== BREAK TIMES ====================
-
-  async createBreakTime(createDto: CreateBreakTimeDto): Promise<BreakTime> {
-    const breakTime = this.breakTimeRepository.create(createDto);
-    return await this.breakTimeRepository.save(breakTime);
-  }
-
-  async findBreaksByDate(date: Date): Promise<BreakTime[]> {
-    return await this.breakTimeRepository.find({
-      where: { break_date: date },
-      order: { start_time: 'ASC' },
-    });
-  }
-
-  async findBreaksByDateRange(
-    startDate: Date,
-    endDate: Date,
-  ): Promise<BreakTime[]> {
-    return await this.breakTimeRepository.find({
-      where: {
-        break_date: Between(startDate, endDate),
+      relations: {
+        client: true,
+        service: true,
       },
-      order: { break_date: 'ASC', start_time: 'ASC' },
+    });
+
+    if (!appointment) {
+      throw new NotFoundException(`Agendamento com ID ${id} não encontrado`);
+    }
+
+    return appointment;
+  }
+
+  /**
+   * Buscar agendamentos por cliente
+   */
+  async findByClient(clientId: number): Promise<Appointment[]> {
+    return await this.appointmentRepository.find({
+      where: { client: { id: clientId } },
+      relations: {
+        service: true,
+      },
+      order: {
+        appointment_date: 'DESC',
+        appointment_time: 'DESC',
+      },
     });
   }
 
-  async deleteBreakTime(id: number): Promise<void> {
-    const breakTime = await this.breakTimeRepository.findOne({
-      where: { id },
+  /**
+   * Buscar agendamentos do dia
+   */
+  async findToday(): Promise<Appointment[]> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    return await this.appointmentRepository.find({
+      where: {
+        appointment_date: Between(today, tomorrow),
+        status: 'confirmed',
+      },
+      relations: {
+        client: true,
+        service: true,
+      },
+      order: {
+        appointment_time: 'ASC',
+      },
     });
-
-    if (!breakTime) {
-      throw new NotFoundException(`Pausa com ID ${id} não encontrada`);
-    }
-
-    await this.breakTimeRepository.remove(breakTime);
   }
 
-  // ==================== UTILITÁRIOS ====================
+  /**
+   * Buscar agendamentos futuros
+   */
+  async findUpcoming(limit: number = 10): Promise<Appointment[]> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-  async getWorkingHoursForDate(date: Date): Promise<{
-    is_working: boolean;
-    start_time?: string;
-    end_time?: string;
-    slot_duration?: number;
-    lunch_start?: string;
-    lunch_end?: string;
-    reason?: string;
-  }> {
-    const isBlocked = await this.blockedDateRepository.findOne({
-      where: { blocked_date: date, is_full_day: true },
+    return await this.appointmentRepository.find({
+      where: {
+        appointment_date: MoreThan(today),
+        status: 'confirmed',
+      },
+      relations: {
+        client: true,
+        service: true,
+      },
+      order: {
+        appointment_date: 'ASC',
+        appointment_time: 'ASC',
+      },
+      take: limit,
     });
+  }
 
-    if (isBlocked) {
-      return { is_working: false, reason: isBlocked.reason };
+  /**
+   * Confirmar agendamento
+   */
+  async confirm(id: number): Promise<Appointment> {
+    const appointment = await this.findById(id);
+
+    if (appointment.status !== 'pending') {
+      throw new BadRequestException(
+        `Não é possível confirmar um agendamento com status ${appointment.status}`,
+      );
     }
 
-    const special = await this.specialHoursRepository.findOne({
-      where: { special_date: date, is_active: true },
-    });
+    appointment.status = 'confirmed';
+    const updated = await this.appointmentRepository.save(appointment);
 
-    if (special) {
-      return {
-        is_working: true,
-        start_time: special.start_time,
-        end_time: special.end_time,
-        slot_duration: special.slot_duration,
-      };
+    // Garantir que o preço é um número
+    const price =
+      typeof appointment.service.price === 'string'
+        ? parseFloat(appointment.service.price)
+        : appointment.service.price;
+
+    // Atualizar estatísticas do cliente
+    await this.clientsService.updateStats(appointment.client.id, price);
+
+    return updated;
+  }
+
+  /**
+   * Completar agendamento (atendimento finalizado)
+   */
+  async complete(id: number): Promise<Appointment> {
+    const appointment = await this.findById(id);
+
+    if (appointment.status !== 'confirmed') {
+      throw new BadRequestException(
+        `Não é possível completar um agendamento com status ${appointment.status}`,
+      );
     }
 
-    const dayOfWeek = date.getDay();
-    const schedule = await this.workScheduleRepository.findOne({
-      where: { day_of_week: dayOfWeek, is_working: true },
+    appointment.status = 'completed';
+    return await this.appointmentRepository.save(appointment);
+  }
+
+  /**
+   * Cancelar agendamento
+   */
+  async cancel(id: number, reason?: string): Promise<Appointment> {
+    const appointment = await this.findById(id);
+
+    if (appointment.status === 'completed') {
+      throw new BadRequestException(
+        'Não é possível cancelar um agendamento já concluído',
+      );
+    }
+
+    appointment.status = 'cancelled';
+    appointment.notes = reason
+      ? `${appointment.notes || ''}\nCancelamento: ${reason}`
+      : appointment.notes;
+
+    return await this.appointmentRepository.save(appointment);
+  }
+
+  /**
+   * Verificar disponibilidade de horário (método auxiliar)
+   */
+  private async checkAvailability(date: Date, time: string): Promise<boolean> {
+    const count = await this.appointmentRepository
+      .createQueryBuilder('appointment')
+      .where('appointment.appointment_date = :date', { date })
+      .andWhere('appointment.appointment_time = :time', { time })
+      .andWhere('appointment.status IN (:...statuses)', {
+        statuses: ['pending', 'confirmed'],
+      })
+      .getCount();
+
+    return count === 0;
+  }
+
+  /**
+   * Reagendar um agendamento
+   */
+  async reschedule(
+    id: number,
+    newDate: Date,
+    newTime: string,
+  ): Promise<Appointment> {
+    const appointment = await this.findById(id);
+
+    if (appointment.status === 'completed') {
+      throw new BadRequestException(
+        'Não é possível reagendar um agendamento já concluído',
+      );
+    }
+
+    // Validar formato do horário
+    const timeParts = newTime.split(':');
+    if (timeParts.length < 2) {
+      throw new BadRequestException(
+        'Formato de horário inválido. Use HH:mm ou HH:mm:ss',
+      );
+    }
+
+    let formattedTime = newTime;
+    if (timeParts.length === 2) {
+      formattedTime = `${newTime}:00`;
+    }
+
+    // Validar se a nova data/hora é no futuro (APENAS PARA HOJE)
+    const [hours, minutes] = formattedTime.split(':').map(Number);
+    const appointmentDate = new Date(newDate);
+    appointmentDate.setHours(hours, minutes, 0, 0);
+
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const appointmentDateStr = new Date(newDate).toISOString().split('T')[0];
+
+    if (appointmentDateStr === todayStr) {
+      const diffMinutes = (appointmentDate.getTime() - now.getTime()) / 60000;
+      if (diffMinutes < -2) {
+        throw new BadRequestException(
+          'Não é possível reagendar para um horário que já passou',
+        );
+      }
+    }
+
+    const isAvailable = await this.checkAvailability(newDate, formattedTime);
+    if (!isAvailable) {
+      throw new ConflictException('Horário não está disponível');
+    }
+
+    appointment.appointment_date = newDate;
+    appointment.appointment_time = formattedTime;
+    appointment.status = 'pending';
+
+    return await this.appointmentRepository.save(appointment);
+  }
+
+  /**
+   * Estatísticas de agendamentos
+   */
+  async getStats(): Promise<any> {
+    const total = await this.appointmentRepository.count();
+    const pending = await this.appointmentRepository.count({
+      where: { status: 'pending' },
+    });
+    const confirmed = await this.appointmentRepository.count({
+      where: { status: 'confirmed' },
+    });
+    const completed = await this.appointmentRepository.count({
+      where: { status: 'completed' },
+    });
+    const cancelled = await this.appointmentRepository.count({
+      where: { status: 'cancelled' },
     });
 
-    if (!schedule) {
-      return { is_working: false, reason: 'Barbearia fechada neste dia' };
-    }
+    const revenueResult = await this.appointmentRepository
+      .createQueryBuilder('appointment')
+      .leftJoin('appointment.service', 'service')
+      .where('appointment.status = :status', { status: 'completed' })
+      .select('SUM(service.price)', 'total')
+      .getRawOne();
 
     return {
-      is_working: true,
-      start_time: schedule.start_time || '09:00',
-      end_time: schedule.end_time || '19:00',
-      slot_duration: schedule.slot_duration || 30,
-      lunch_start: schedule.lunch_start,
-      lunch_end: schedule.lunch_end,
+      total,
+      pending,
+      confirmed,
+      completed,
+      cancelled,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      total_revenue: revenueResult?.total || 0,
     };
   }
 
   /**
-   * ✅ Gerar slots para o dia atual (com validação de horário passado)
+   * Deletar agendamento (apenas se pendente ou cancelado)
    */
-  async generateTodaySlots(serviceDuration: number = 30): Promise<string[]> {
-    const today = new Date();
-    const dateStr = today.toISOString().split('T')[0];
-    const date = new Date(dateStr);
+  async delete(id: number): Promise<void> {
+    const appointment = await this.findById(id);
 
-    const workingHours = await this.getWorkingHoursForDate(date);
-
-    if (!workingHours.is_working) {
-      return [];
-    }
-
-    if (!workingHours.start_time || !workingHours.end_time) {
-      return [];
-    }
-
-    const breaks = await this.findBreaksByDate(date);
-
-    const existingAppointments = await this.appointmentRepository.find({
-      where: {
-        appointment_date: date,
-        status: In(['confirmed', 'pending']),
-      },
-    });
-
-    const busyTimes = new Set(
-      existingAppointments.map((a) => a.appointment_time),
-    );
-
-    const now = new Date();
-    const currentTime = now.toTimeString().slice(0, 5);
-
-    const slots: string[] = [];
-    let currentTimeSlot = workingHours.start_time;
-    const endTime = workingHours.end_time;
-    const slotDuration = workingHours.slot_duration || 30;
-
-    while (
-      this.timeToMinutes(currentTimeSlot) + serviceDuration <=
-      this.timeToMinutes(endTime)
+    if (
+      appointment.status !== 'pending' &&
+      appointment.status !== 'cancelled'
     ) {
-      if (workingHours.lunch_start && workingHours.lunch_end) {
-        if (
-          currentTimeSlot >= workingHours.lunch_start &&
-          currentTimeSlot < workingHours.lunch_end
-        ) {
-          currentTimeSlot = workingHours.lunch_end;
-          continue;
-        }
-      }
-
-      let isBreak = false;
-      for (const breakItem of breaks) {
-        if (
-          currentTimeSlot >= breakItem.start_time &&
-          currentTimeSlot < breakItem.end_time
-        ) {
-          currentTimeSlot = breakItem.end_time;
-          isBreak = true;
-          break;
-        }
-      }
-
-      if (isBreak) continue;
-
-      if (!busyTimes.has(currentTimeSlot)) {
-        // ✅ VALIDAÇÃO DE HORÁRIO PASSADO para hoje
-        if (currentTimeSlot >= currentTime) {
-          slots.push(currentTimeSlot);
-        }
-      }
-
-      currentTimeSlot = this.addMinutes(currentTimeSlot, slotDuration);
+      throw new BadRequestException(
+        'Só é possível deletar agendamentos pendentes ou cancelados',
+      );
     }
 
-    return slots;
+    await this.appointmentRepository.remove(appointment);
   }
 
   /**
-   * ✅ Gerar slots para uma data específica (SEM validação de horário passado)
+   * Atualizar agendamento
    */
-  async generateAvailableSlots(
-    date: Date,
-    serviceDuration: number = 30,
-  ): Promise<string[]> {
-    const workingHours = await this.getWorkingHoursForDate(date);
+  async update(
+    id: number,
+    updateDto: UpdateAppointmentDto,
+  ): Promise<Appointment> {
+    const appointment = await this.findById(id);
 
-    if (!workingHours.is_working) {
-      return [];
+    if (appointment.status === 'completed') {
+      throw new BadRequestException(
+        'Não é possível atualizar um agendamento já concluído',
+      );
     }
 
-    if (!workingHours.start_time || !workingHours.end_time) {
-      return [];
-    }
+    if (updateDto.appointment_date || updateDto.appointment_time) {
+      const newDate =
+        updateDto.appointment_date || appointment.appointment_date;
+      let newTime = updateDto.appointment_time || appointment.appointment_time;
 
-    const breaks = await this.findBreaksByDate(date);
-
-    const existingAppointments = await this.appointmentRepository.find({
-      where: {
-        appointment_date: date,
-        status: In(['confirmed', 'pending']),
-      },
-    });
-
-    const busyTimes = new Set(
-      existingAppointments.map((a) => a.appointment_time),
-    );
-
-    const slots: string[] = [];
-    let currentTimeSlot = workingHours.start_time;
-    const endTime = workingHours.end_time;
-    const slotDuration = workingHours.slot_duration || 30;
-
-    while (
-      this.timeToMinutes(currentTimeSlot) + serviceDuration <=
-      this.timeToMinutes(endTime)
-    ) {
-      if (workingHours.lunch_start && workingHours.lunch_end) {
-        if (
-          currentTimeSlot >= workingHours.lunch_start &&
-          currentTimeSlot < workingHours.lunch_end
-        ) {
-          currentTimeSlot = workingHours.lunch_end;
-          continue;
+      if (
+        newDate !== appointment.appointment_date ||
+        newTime !== appointment.appointment_time
+      ) {
+        // Validar formato do horário
+        const timeParts = newTime.split(':');
+        if (timeParts.length < 2) {
+          throw new BadRequestException(
+            'Formato de horário inválido. Use HH:mm ou HH:mm:ss',
+          );
         }
-      }
 
-      let isBreak = false;
-      for (const breakItem of breaks) {
-        if (
-          currentTimeSlot >= breakItem.start_time &&
-          currentTimeSlot < breakItem.end_time
-        ) {
-          currentTimeSlot = breakItem.end_time;
-          isBreak = true;
-          break;
+        if (timeParts.length === 2) {
+          newTime = `${newTime}:00`;
         }
-      }
 
-      if (isBreak) continue;
+        // Validar se a nova data/hora é no futuro (APENAS PARA HOJE)
+        const [hours, minutes] = newTime.split(':').map(Number);
+        const appointmentDate = new Date(newDate);
+        appointmentDate.setHours(hours, minutes, 0, 0);
 
-      // ✅ SEM validação de horário passado
-      if (!busyTimes.has(currentTimeSlot)) {
-        slots.push(currentTimeSlot);
-      }
+        const now = new Date();
+        const todayStr = now.toISOString().split('T')[0];
+        const appointmentDateStr = new Date(newDate)
+          .toISOString()
+          .split('T')[0];
 
-      currentTimeSlot = this.addMinutes(currentTimeSlot, slotDuration);
-    }
+        if (appointmentDateStr === todayStr) {
+          const diffMinutes =
+            (appointmentDate.getTime() - now.getTime()) / 60000;
+          if (diffMinutes < -2) {
+            throw new BadRequestException(
+              'Não é possível atualizar para um horário que já passou',
+            );
+          }
+        }
 
-    return slots;
-  }
+        const isAvailable = await this.checkAvailability(newDate, newTime);
+        if (!isAvailable) {
+          throw new ConflictException('Horário não está disponível');
+        }
 
-  async setupDefaultSchedule(): Promise<void> {
-    const defaultSchedules = [
-      { day_of_week: 0, is_working: false },
-      {
-        day_of_week: 1,
-        is_working: true,
-        start_time: '09:00',
-        end_time: '19:00',
-        slot_duration: 30,
-      },
-      {
-        day_of_week: 2,
-        is_working: true,
-        start_time: '09:00',
-        end_time: '19:00',
-        slot_duration: 30,
-      },
-      {
-        day_of_week: 3,
-        is_working: true,
-        start_time: '09:00',
-        end_time: '19:00',
-        slot_duration: 30,
-      },
-      {
-        day_of_week: 4,
-        is_working: true,
-        start_time: '09:00',
-        end_time: '19:00',
-        slot_duration: 30,
-      },
-      {
-        day_of_week: 5,
-        is_working: true,
-        start_time: '09:00',
-        end_time: '19:00',
-        slot_duration: 30,
-      },
-      {
-        day_of_week: 6,
-        is_working: true,
-        start_time: '09:00',
-        end_time: '16:00',
-        slot_duration: 30,
-      },
-    ];
-
-    for (const schedule of defaultSchedules) {
-      const existing = await this.workScheduleRepository.findOne({
-        where: { day_of_week: schedule.day_of_week },
-      });
-
-      if (!existing) {
-        const newSchedule = this.workScheduleRepository.create(schedule);
-        await this.workScheduleRepository.save(newSchedule);
+        appointment.appointment_date = newDate;
+        appointment.appointment_time = newTime;
       }
     }
-  }
 
-  // ==================== UTILITÁRIOS PRIVADOS ====================
+    if (updateDto.notes !== undefined) {
+      appointment.notes = updateDto.notes;
+    }
 
-  private timeToMinutes(time: string): number {
-    if (!time) return 0;
-    const [hours, minutes] = time.split(':').map(Number);
-    return hours * 60 + minutes;
-  }
-
-  private addMinutes(time: string, minutes: number): string {
-    if (!time) return '00:00';
-    const totalMinutes = this.timeToMinutes(time) + minutes;
-    const hours = Math.floor(totalMinutes / 60);
-    const mins = totalMinutes % 60;
-    return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+    return await this.appointmentRepository.save(appointment);
   }
 }

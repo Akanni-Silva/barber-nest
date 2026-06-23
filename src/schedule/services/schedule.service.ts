@@ -1,5 +1,9 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/restrict-template-expressions */
-
+/* eslint-disable @typescript-eslint/no-redundant-type-constituents */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+// src/schedule/services/schedule.service.ts
 import {
   Injectable,
   NotFoundException,
@@ -7,17 +11,17 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, In } from 'typeorm';
+import { WorkSchedule } from '../../schedule/entities/work-schedule.entity';
+import { BlockedDate } from '../../schedule/entities/blocked-date.entity';
+import { SpecialHours } from '../../schedule/entities/special-hours.entity';
+import { BreakTime } from '../../schedule/entities/break-time.entity';
 
-import { WorkSchedule } from '../entities/work-schedule.entity';
-import { BlockedDate } from '../entities/blocked-date.entity';
-import { SpecialHours } from '../entities/special-hours.entity';
-import { BreakTime } from '../entities/break-time.entity';
+import { CreateWorkScheduleDto } from '../../schedule/dto/create-work-schedule.dto';
+import { UpdateWorkScheduleDto } from '../../schedule/dto/update-work-schedule.dto';
+import { CreateBlockedDateDto } from '../../schedule/dto/create-blocked-date.dto';
+import { CreateSpecialHoursDto } from '../../schedule/dto/create-special-hours.dto';
+import { CreateBreakTimeDto } from '../../schedule/dto/create-break-time.dto';
 import { Appointment } from '../../appointments/entities/appointment.entity';
-import { CreateWorkScheduleDto } from '../dto/create-work-schedule.dto';
-import { UpdateWorkScheduleDto } from '../dto/update-work-schedule.dto';
-import { CreateBlockedDateDto } from '../dto/create-blocked-date.dto';
-import { CreateSpecialHoursDto } from '../dto/create-special-hours.dto';
-import { CreateBreakTimeDto } from '../dto/create-break-time.dto';
 
 @Injectable()
 export class ScheduleService {
@@ -312,12 +316,13 @@ export class ScheduleService {
   }
 
   /**
-   * Gerar slots disponíveis para uma data
+   * ✅ Gerar slots para o dia atual (com validação de horário passado)
    */
-  async generateAvailableSlots(
-    date: Date,
-    serviceDuration: number = 30,
-  ): Promise<string[]> {
+  async generateTodaySlots(serviceDuration: number = 30): Promise<string[]> {
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0];
+    const date = new Date(dateStr);
+
     const workingHours = await this.getWorkingHoursForDate(date);
 
     if (!workingHours.is_working) {
@@ -342,7 +347,6 @@ export class ScheduleService {
     );
 
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
     const currentTime = now.toTimeString().slice(0, 5);
 
     const slots: string[] = [];
@@ -379,13 +383,84 @@ export class ScheduleService {
       if (isBreak) continue;
 
       if (!busyTimes.has(currentTimeSlot)) {
-        const isPastSlot =
-          date.toISOString().split('T')[0] === todayStr &&
-          currentTimeSlot < currentTime;
-
-        if (!isPastSlot) {
+        // ✅ VALIDAÇÃO DE HORÁRIO PASSADO para hoje
+        if (currentTimeSlot >= currentTime) {
           slots.push(currentTimeSlot);
         }
+      }
+
+      currentTimeSlot = this.addMinutes(currentTimeSlot, slotDuration);
+    }
+
+    return slots;
+  }
+
+  /**
+   * ✅ Gerar slots para uma data específica (SEM validação de horário passado)
+   */
+  async generateAvailableSlots(
+    date: Date,
+    serviceDuration: number = 30,
+  ): Promise<string[]> {
+    const workingHours = await this.getWorkingHoursForDate(date);
+
+    if (!workingHours.is_working) {
+      return [];
+    }
+
+    if (!workingHours.start_time || !workingHours.end_time) {
+      return [];
+    }
+
+    const breaks = await this.findBreaksByDate(date);
+
+    const existingAppointments = await this.appointmentRepository.find({
+      where: {
+        appointment_date: date,
+        status: In(['confirmed', 'pending']),
+      },
+    });
+
+    const busyTimes = new Set(
+      existingAppointments.map((a) => a.appointment_time),
+    );
+
+    const slots: string[] = [];
+    let currentTimeSlot = workingHours.start_time;
+    const endTime = workingHours.end_time;
+    const slotDuration = workingHours.slot_duration || 30;
+
+    while (
+      this.timeToMinutes(currentTimeSlot) + serviceDuration <=
+      this.timeToMinutes(endTime)
+    ) {
+      if (workingHours.lunch_start && workingHours.lunch_end) {
+        if (
+          currentTimeSlot >= workingHours.lunch_start &&
+          currentTimeSlot < workingHours.lunch_end
+        ) {
+          currentTimeSlot = workingHours.lunch_end;
+          continue;
+        }
+      }
+
+      let isBreak = false;
+      for (const breakItem of breaks) {
+        if (
+          currentTimeSlot >= breakItem.start_time &&
+          currentTimeSlot < breakItem.end_time
+        ) {
+          currentTimeSlot = breakItem.end_time;
+          isBreak = true;
+          break;
+        }
+      }
+
+      if (isBreak) continue;
+
+      // ✅ SEM validação de horário passado
+      if (!busyTimes.has(currentTimeSlot)) {
+        slots.push(currentTimeSlot);
       }
 
       currentTimeSlot = this.addMinutes(currentTimeSlot, slotDuration);

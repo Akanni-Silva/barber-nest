@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 // src/schedule/controllers/schedule.controller.ts
 import {
   Controller,
@@ -21,14 +23,15 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
-import { ScheduleService } from '../services/schedule.service';
-import { CreateWorkScheduleDto } from '../dto/create-work-schedule.dto';
-import { UpdateWorkScheduleDto } from '../dto/update-work-schedule.dto';
-import { CreateBlockedDateDto } from '../dto/create-blocked-date.dto';
-import { CreateSpecialHoursDto } from '../dto/create-special-hours.dto';
-import { CreateBreakTimeDto } from '../dto/create-break-time.dto';
+
 import { JwtAuthGuard } from '../../auth/guard/jwt-auth.guard';
 import { BarberGuard } from '../../auth/guard/barber.guard';
+import { CreateWorkScheduleDto } from '../../schedule/dto/create-work-schedule.dto';
+import { UpdateWorkScheduleDto } from '../../schedule/dto/update-work-schedule.dto';
+import { CreateBlockedDateDto } from '../../schedule/dto/create-blocked-date.dto';
+import { CreateSpecialHoursDto } from '../../schedule/dto/create-special-hours.dto';
+import { CreateBreakTimeDto } from '../../schedule/dto/create-break-time.dto';
+import { ScheduleService } from '../services/schedule.service';
 
 @ApiTags('Agenda')
 @ApiBearerAuth()
@@ -37,18 +40,62 @@ export class ScheduleController {
   constructor(private readonly scheduleService: ScheduleService) {}
 
   /**
-   * ✅ PÚBLICO - Cliente pode ver horários disponíveis
-   * GET /schedule/available-slots
+   * ✅ PÚBLICO - Buscar horários disponíveis para HOJE (com validação de horário passado)
+   * GET /schedule/today-slots
    */
-  @Get('available-slots')
-  @ApiOperation({ summary: 'Buscar horários disponíveis (público)' })
-  @ApiQuery({ name: 'date', description: 'Data no formato YYYY-MM-DD' })
+  @Get('today-slots')
+  @ApiOperation({
+    summary:
+      'Buscar horários disponíveis para hoje (com validação de horário passado)',
+    description: 'Retorna apenas horários futuros para o dia atual',
+  })
   @ApiQuery({
     name: 'duration',
     required: false,
     description: 'Duração do serviço em minutos',
+    example: 30,
   })
-  @ApiResponse({ status: 200, description: 'Lista de horários disponíveis' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de horários disponíveis para hoje',
+    schema: {
+      example: ['09:00', '09:30', '10:00', '10:30'],
+    },
+  })
+  async getTodaySlots(@Query('duration') duration?: string) {
+    return await this.scheduleService.generateTodaySlots(
+      duration ? parseInt(duration) : 30,
+    );
+  }
+
+  /**
+   * ✅ PÚBLICO - Buscar horários disponíveis para uma data específica (SEM validação de horário passado)
+   * GET /schedule/available-slots
+   */
+  @Get('available-slots')
+  @ApiOperation({
+    summary: 'Buscar horários disponíveis para uma data específica',
+    description:
+      'Retorna todos os horários disponíveis para a data informada, sem validar se já passaram',
+  })
+  @ApiQuery({
+    name: 'date',
+    description: 'Data no formato YYYY-MM-DD',
+    example: '2026-06-24',
+  })
+  @ApiQuery({
+    name: 'duration',
+    required: false,
+    description: 'Duração do serviço em minutos',
+    example: 30,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de horários disponíveis',
+    schema: {
+      example: ['09:00', '09:30', '10:00', '10:30'],
+    },
+  })
   async getAvailableSlots(
     @Query('date') date: string,
     @Query('duration') duration?: string,
@@ -60,16 +107,66 @@ export class ScheduleController {
   }
 
   /**
-   * ✅ PÚBLICO - Cliente pode ver horário de funcionamento
+   * ✅ PÚBLICO - Buscar horário de funcionamento para HOJE
+   * GET /schedule/today-working-hours
+   */
+  @Get('today-working-hours')
+  @ApiOperation({
+    summary: 'Buscar horário de funcionamento para hoje',
+    description:
+      'Retorna o horário de funcionamento configurado para o dia atual',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Horário de funcionamento de hoje',
+    schema: {
+      example: {
+        is_working: true,
+        start_time: '09:00',
+        end_time: '19:00',
+        slot_duration: 30,
+      },
+    },
+  })
+  async getTodayWorkingHours() {
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0];
+    const date = new Date(dateStr);
+    return await this.scheduleService.getWorkingHoursForDate(date);
+  }
+
+  /**
+   * ✅ PÚBLICO - Buscar horário de funcionamento para uma data específica
    * GET /schedule/working-hours
    */
   @Get('working-hours')
-  @ApiOperation({ summary: 'Buscar horário de funcionamento (público)' })
-  @ApiQuery({ name: 'date', description: 'Data no formato YYYY-MM-DD' })
-  @ApiResponse({ status: 200, description: 'Horário de funcionamento' })
+  @ApiOperation({
+    summary: 'Buscar horário de funcionamento para uma data específica',
+    description:
+      'Retorna o horário de funcionamento configurado para a data informada',
+  })
+  @ApiQuery({
+    name: 'date',
+    description: 'Data no formato YYYY-MM-DD',
+    example: '2026-06-24',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Horário de funcionamento',
+    schema: {
+      example: {
+        is_working: true,
+        start_time: '09:00',
+        end_time: '19:00',
+        slot_duration: 30,
+      },
+    },
+  })
   async getWorkingHours(@Query('date') date: string) {
     return await this.scheduleService.getWorkingHoursForDate(new Date(date));
   }
+
+  // ==================== ENDPOINTS PROTEGIDOS ====================
 
   /**
    * ❌ PROTEGIDO - Configurar horário de trabalho
@@ -107,6 +204,7 @@ export class ScheduleController {
   @ApiParam({
     name: 'dayOfWeek',
     description: '0=Domingo, 1=Segunda, ..., 6=Sábado',
+    example: 1,
   })
   @ApiResponse({ status: 200, description: 'Horário encontrado' })
   @ApiResponse({ status: 401, description: 'Não autorizado' })

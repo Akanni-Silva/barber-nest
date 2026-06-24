@@ -1,6 +1,8 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/restrict-template-expressions */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-// src/appointments/services/appointments.service.ts
+
 import {
   ConflictException,
   Injectable,
@@ -26,8 +28,9 @@ export class AppointmentsService {
   ) {}
 
   /**
-   * ✅ Criar um novo agendamento com validação CORRETA
+   * ✅ Criar um novo agendamento com validação CORRETA de horário
    */
+
   async create(createDto: CreateAppointmentDto): Promise<Appointment> {
     // 1. Validar dados obrigatórios
     if (!createDto.client_name || !createDto.client_phone) {
@@ -85,25 +88,30 @@ export class AppointmentsService {
       throw new BadRequestException(`Horário inválido: ${formattedTime}`);
     }
 
-    // ✅ 5. Validar se a data/hora é no futuro (APENAS PARA HOJE)
+    // ✅ 5. Validar se a data/hora é no futuro
     const now = new Date();
-    const appointmentDate = new Date(createDto.appointment_date);
-    appointmentDate.setHours(hours, minutes, 0, 0);
 
-    // ✅ Verificar se a data do agendamento é hoje
-    const todayStr = now.toISOString().split('T')[0];
-    const appointmentDateStr = new Date(createDto.appointment_date)
-      .toISOString()
-      .split('T')[0];
+    // ✅ CORRIGIDO: Converter Date para string com toISOString()
+    let dateStr: string;
+    if (createDto.appointment_date instanceof Date) {
+      dateStr = createDto.appointment_date.toISOString().split('T')[0];
+    } else {
+      dateStr = String(createDto.appointment_date);
+    }
 
-    // ✅ Só validar horário passado se for o dia atual
-    if (appointmentDateStr === todayStr) {
-      const diffMinutes = (appointmentDate.getTime() - now.getTime()) / 60000;
-      if (diffMinutes < -2) {
-        throw new BadRequestException(
-          `Não é possível agendar para um horário que já passou (${formattedTime})`,
-        );
-      }
+    const [year, month, day] = dateStr.split('-').map(Number);
+
+    // ✅ Criar data no timezone local usando horas e minutos do formattedTime
+    const timeZoneOffset = process.env.TZ || '-03:00';
+    const appointmentDate = new Date(
+      `${dateStr}T${formattedTime}${timeZoneOffset}`,
+    );
+
+    // Rejeita apenas se o horário já passou no momento da requisição
+    if (appointmentDate.getTime() < now.getTime() - 2 * 60 * 1000) {
+      throw new BadRequestException(
+        `Não é possível agendar para um horário que já passou (${formattedTime})`,
+      );
     }
 
     // 6. Usar transação com lock pessimista

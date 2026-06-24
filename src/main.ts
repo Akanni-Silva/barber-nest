@@ -5,7 +5,8 @@ import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
-  process.env.TZ = 'America/Sao_Paulo';
+  // ✅ FORÇAR TIMEZONE BRASILEIRO
+  process.env.TZ = '-03:00';
 
   const app = await NestFactory.create(AppModule);
 
@@ -24,7 +25,6 @@ async function bootstrap() {
   SwaggerModule.setup('/swagger', app, document);
 
   app.useGlobalPipes(new ValidationPipe());
-
   app.enableCors();
 
   await app.listen(process.env.PORT ?? 4000);

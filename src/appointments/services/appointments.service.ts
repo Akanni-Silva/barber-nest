@@ -167,49 +167,55 @@ export class AppointmentsService {
   /**
    * Buscar todos agendamentos (com filtros)
    */
-  async findAll(filters?: {
-    status?: string;
-    startDate?: Date;
-    endDate?: Date;
-    page?: number;
-    limit?: number;
-  }): Promise<{ appointments: Appointment[]; total: number }> {
-    const page = filters?.page || 1;
-    const limit = filters?.limit || 20;
-    const skip = (page - 1) * limit;
-
-    const query = this.appointmentRepository
+  async findAll(filters: any) {
+    const queryBuilder = this.appointmentRepository
       .createQueryBuilder('appointment')
       .leftJoinAndSelect('appointment.client', 'client')
       .leftJoinAndSelect('appointment.service', 'service');
 
-    if (filters?.status) {
-      query.andWhere('appointment.status = :status', {
+    // Aplicar filtros (status, startDate, endDate)
+    if (filters.status) {
+      queryBuilder.andWhere('appointment.status = :status', {
         status: filters.status,
       });
     }
 
-    if (filters?.startDate) {
-      query.andWhere('appointment.appointment_date >= :startDate', {
+    if (filters.startDate) {
+      queryBuilder.andWhere('appointment.appointment_date >= :startDate', {
         startDate: filters.startDate,
       });
     }
 
-    if (filters?.endDate) {
-      query.andWhere('appointment.appointment_date <= :endDate', {
+    if (filters.endDate) {
+      queryBuilder.andWhere('appointment.appointment_date <= :endDate', {
         endDate: filters.endDate,
       });
     }
 
-    query
-      .orderBy('appointment.appointment_date', 'ASC')
-      .addOrderBy('appointment.appointment_time', 'ASC')
-      .skip(skip)
-      .take(limit);
+    // ✅ ORDENAÇÃO POR DATA DO AGENDAMENTO - MAIS RECENTES PRIMEIRO
+    // appointment_date DESC = agendamentos futuros primeiro
+    // Para mais antigos primeiro, use 'ASC'
+    queryBuilder.orderBy('appointment.appointment_date', 'DESC');
 
-    const [appointments, total] = await query.getManyAndCount();
+    // Como segundo critério, ordenar por horário (também DESC)
+    queryBuilder.addOrderBy('appointment.appointment_time', 'DESC');
 
-    return { appointments, total };
+    // Paginação
+    const page = filters.page || 1;
+    const limit = filters.limit || 10;
+    const skip = (page - 1) * limit;
+
+    queryBuilder.skip(skip).take(limit);
+
+    const [appointments, total] = await queryBuilder.getManyAndCount();
+
+    return {
+      appointments,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   /**

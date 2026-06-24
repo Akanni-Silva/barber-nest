@@ -26,6 +26,7 @@ export class ProdService implements TypeOrmOptionsFactory {
         max: 20,
         connectionTimeoutMillis: 30000,
         idleTimeoutMillis: 30000,
+        timezone: 'America/Sao_Paulo',
         // ✅ SSL também pode ser configurado aqui
         ssl: {
           rejectUnauthorized: false,

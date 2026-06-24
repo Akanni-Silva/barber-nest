@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
 // src/schedule/controllers/schedule.controller.ts
 import {
   Controller,
@@ -44,55 +42,26 @@ export class ScheduleController {
     return new Date(year, month - 1, day);
   }
 
-  /**
-   * ✅ PÚBLICO - Buscar horários disponíveis para HOJE (com validação de horário passado)
-   * GET /schedule/today-slots
-   */
-  @Get('today-slots')
-  @ApiOperation({
-    summary:
-      'Buscar horários disponíveis para hoje (com validação de horário passado)',
-    description: 'Retorna apenas horários futuros para o dia atual',
-  })
-  @ApiQuery({
-    name: 'duration',
-    required: false,
-    description: 'Duração do serviço em minutos',
-    example: 30,
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Lista de horários disponíveis para hoje',
-    schema: {
-      example: ['09:00', '09:30', '10:00', '10:30'],
-    },
-  })
-  async getTodaySlots(@Query('duration') duration?: string) {
-    return await this.scheduleService.generateTodaySlots(
-      duration ? parseInt(duration) : 30,
-    );
-  }
+  // ==================== ENDPOINTS PÚBLICOS ====================
 
   /**
-   * ✅ PÚBLICO - Buscar horários disponíveis para uma data específica (SEM validação de horário passado)
+   * ✅ PÚBLICO - Buscar horários disponíveis
    * GET /schedule/available-slots
+   * Retorna horários disponíveis para a data informada.
+   * - Remove horários com agendamentos pendentes ou confirmados
+   * - Se for hoje, remove horários que já passaram
    */
   @Get('available-slots')
   @ApiOperation({
     summary: 'Buscar horários disponíveis para uma data específica',
     description:
-      'Retorna todos os horários disponíveis para a data informada, sem validar se já passaram',
+      'Retorna horários disponíveis para a data informada (sem agendamentos pendentes/confirmados). Se for hoje, remove horários passados.',
   })
   @ApiQuery({
     name: 'date',
     description: 'Data no formato YYYY-MM-DD',
     example: '2026-06-24',
-  })
-  @ApiQuery({
-    name: 'duration',
-    required: false,
-    description: 'Duração do serviço em minutos',
-    example: 30,
+    required: true,
   })
   @ApiResponse({
     status: 200,
@@ -103,11 +72,12 @@ export class ScheduleController {
   })
   async getAvailableSlots(
     @Query('date') date: string,
-    @Query('duration') duration?: string,
+    @Query('includePast') includePast?: string,
   ) {
+    const includePastFlag = includePast === 'true' || includePast === '1';
     return await this.scheduleService.generateAvailableSlots(
       this.parseDate(date),
-      duration ? parseInt(duration) : 30,
+      includePastFlag,
     );
   }
 
@@ -176,7 +146,7 @@ export class ScheduleController {
     );
   }
 
-  // ==================== ENDPOINTS PROTEGIDOS ====================
+  // ==================== ENDPOINTS PROTEGIDOS (BARBEIRO) ====================
 
   /**
    * ❌ PROTEGIDO - Configurar horário de trabalho

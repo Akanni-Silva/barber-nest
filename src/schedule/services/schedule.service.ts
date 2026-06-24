@@ -325,90 +325,13 @@ export class ScheduleService {
   }
 
   /**
-   * ✅ Gerar slots para o dia atual (com validação de horário passado)
-   */
-  async generateTodaySlots(serviceDuration: number = 30): Promise<string[]> {
-    const today = new Date();
-    const date = this.normalizeDate(today);
-
-    const workingHours = await this.getWorkingHoursForDate(date);
-
-    if (!workingHours.is_working) {
-      return [];
-    }
-
-    if (!workingHours.start_time || !workingHours.end_time) {
-      return [];
-    }
-
-    const breaks = await this.findBreaksByDate(date);
-
-    const existingAppointments = await this.appointmentRepository.find({
-      where: {
-        appointment_date: date,
-        status: In(['confirmed', 'pending']),
-      },
-    });
-
-    const busyTimes = new Set(
-      existingAppointments.map((a) => a.appointment_time),
-    );
-
-    const now = new Date();
-    const currentTime = now.toTimeString().slice(0, 5);
-
-    const slots: string[] = [];
-    let currentTimeSlot = workingHours.start_time;
-    const endTime = workingHours.end_time;
-    const slotDuration = workingHours.slot_duration || 30;
-
-    while (
-      this.timeToMinutes(currentTimeSlot) + serviceDuration <=
-      this.timeToMinutes(endTime)
-    ) {
-      if (workingHours.lunch_start && workingHours.lunch_end) {
-        if (
-          currentTimeSlot >= workingHours.lunch_start &&
-          currentTimeSlot < workingHours.lunch_end
-        ) {
-          currentTimeSlot = workingHours.lunch_end;
-          continue;
-        }
-      }
-
-      let isBreak = false;
-      for (const breakItem of breaks) {
-        if (
-          currentTimeSlot >= breakItem.start_time &&
-          currentTimeSlot < breakItem.end_time
-        ) {
-          currentTimeSlot = breakItem.end_time;
-          isBreak = true;
-          break;
-        }
-      }
-
-      if (isBreak) continue;
-
-      if (!busyTimes.has(currentTimeSlot)) {
-        // ✅ VALIDAÇÃO DE HORÁRIO PASSADO para hoje
-        if (currentTimeSlot >= currentTime) {
-          slots.push(currentTimeSlot);
-        }
-      }
-
-      currentTimeSlot = this.addMinutes(currentTimeSlot, slotDuration);
-    }
-
-    return slots;
-  }
-
-  /**
-   * ✅ Gerar slots para uma data específica (SEM validação de horário passado)
+   * ✅ Gerar slots para uma data específica
+   * - Remove horários com agendamentos pendentes ou confirmados
+   * - Se for hoje, remove horários que já passaram
    */
   async generateAvailableSlots(
     date: Date,
-    serviceDuration: number = 30,
+    includePast = false,
   ): Promise<string[]> {
     date = this.normalizeDate(date);
     const workingHours = await this.getWorkingHoursForDate(date);
@@ -423,6 +346,22 @@ export class ScheduleService {
 
     const breaks = await this.findBreaksByDate(date);
 
+    // Normalizar tempos para formato HH:MM (remover segundos) vindo do DB
+    const normalizeTime = (t?: string) => (t ? t.slice(0, 5) : undefined);
+
+    const startTime = normalizeTime(workingHours.start_time)!;
+    const endTime = normalizeTime(workingHours.end_time)!;
+    const lunchStart = normalizeTime(workingHours.lunch_start);
+    const lunchEnd = normalizeTime(workingHours.lunch_end);
+
+    // Normalizar pausas (criar cópia simplificada)
+    const normalizedBreaks = breaks.map((b) => ({
+      ...b,
+      start_time: normalizeTime(b.start_time),
+      end_time: normalizeTime(b.end_time),
+    }));
+
+    // ✅ Buscar agendamentos ocupados (pending e confirmed)
     const existingAppointments = await this.appointmentRepository.find({
       where: {
         appointment_date: date,
@@ -431,31 +370,54 @@ export class ScheduleService {
     });
 
     const busyTimes = new Set(
-      existingAppointments.map((a) => a.appointment_time),
+      existingAppointments.map((a) =>
+        a.appointment_time ? a.appointment_time.slice(0, 5) : undefined,
+      ),
     );
 
+    // ✅ Verificar se é hoje para filtrar horários passados
+    const serverNow = new Date();
+    // Converter para horário de São Paulo para comparação/filtragem
+    const nowSP = new Date(
+      serverNow.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }),
+    );
+    const today = this.normalizeDate(nowSP);
+
+    // ✅ CORRIGIDO: Comparar dia, mês e ano
+    const isToday =
+      date.getFullYear() === today.getFullYear() &&
+      date.getMonth() === today.getMonth() &&
+      date.getDate() === today.getDate();
+
+    const currentTime = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'America/Sao_Paulo',
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(serverNow);
+
     const slots: string[] = [];
-    let currentTimeSlot = workingHours.start_time;
-    const endTime = workingHours.end_time;
+    let currentTimeSlot = startTime;
     const slotDuration = workingHours.slot_duration || 30;
 
     while (
-      this.timeToMinutes(currentTimeSlot) + serviceDuration <=
+      this.timeToMinutes(currentTimeSlot) + slotDuration <=
       this.timeToMinutes(endTime)
     ) {
-      if (workingHours.lunch_start && workingHours.lunch_end) {
-        if (
-          currentTimeSlot >= workingHours.lunch_start &&
-          currentTimeSlot < workingHours.lunch_end
-        ) {
-          currentTimeSlot = workingHours.lunch_end;
+      // Verificar horário de almoço
+      if (lunchStart && lunchEnd) {
+        if (currentTimeSlot >= lunchStart && currentTimeSlot < lunchEnd) {
+          currentTimeSlot = lunchEnd;
           continue;
         }
       }
 
+      // Verificar pausas
       let isBreak = false;
-      for (const breakItem of breaks) {
+      for (const breakItem of normalizedBreaks) {
         if (
+          breakItem.start_time &&
+          breakItem.end_time &&
           currentTimeSlot >= breakItem.start_time &&
           currentTimeSlot < breakItem.end_time
         ) {
@@ -467,9 +429,17 @@ export class ScheduleService {
 
       if (isBreak) continue;
 
-      // ✅ SEM validação de horário passado
+      // ✅ Pular horários ocupados
       if (!busyTimes.has(currentTimeSlot)) {
-        slots.push(currentTimeSlot);
+        // ✅ Se for hoje, verificar se o horário já passou
+        let isPastSlot = false;
+        if (isToday && !includePast) {
+          isPastSlot = currentTimeSlot < currentTime;
+        }
+
+        if (!isPastSlot) {
+          slots.push(currentTimeSlot);
+        }
       }
 
       currentTimeSlot = this.addMinutes(currentTimeSlot, slotDuration);

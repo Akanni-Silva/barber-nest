@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/restrict-template-expressions */
 /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -259,7 +260,7 @@ export class AppointmentsService {
     return await this.appointmentRepository.find({
       where: {
         appointment_date: Between(today, tomorrow),
-        status: 'confirmed',
+        status: In(['pending', 'confirmed']),
       },
       relations: {
         client: true,
@@ -281,7 +282,7 @@ export class AppointmentsService {
     return await this.appointmentRepository.find({
       where: {
         appointment_date: MoreThan(today),
-        status: 'confirmed',
+        status: In(['pending', 'confirmed']),
       },
       relations: {
         client: true,
@@ -464,8 +465,7 @@ export class AppointmentsService {
       confirmed,
       completed,
       cancelled,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      total_revenue: revenueResult?.total || 0,
+      total_revenue: Number(revenueResult?.total ?? 0),
     };
   }
 

@@ -39,6 +39,11 @@ import { ScheduleService } from '../services/schedule.service';
 export class ScheduleController {
   constructor(private readonly scheduleService: ScheduleService) {}
 
+  private parseDate(date: string): Date {
+    const [year, month, day] = date.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  }
+
   /**
    * ✅ PÚBLICO - Buscar horários disponíveis para HOJE (com validação de horário passado)
    * GET /schedule/today-slots
@@ -101,7 +106,7 @@ export class ScheduleController {
     @Query('duration') duration?: string,
   ) {
     return await this.scheduleService.generateAvailableSlots(
-      new Date(date),
+      this.parseDate(date),
       duration ? parseInt(duration) : 30,
     );
   }
@@ -130,8 +135,11 @@ export class ScheduleController {
   })
   async getTodayWorkingHours() {
     const today = new Date();
-    const dateStr = today.toISOString().split('T')[0];
-    const date = new Date(dateStr);
+    const date = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+    );
     return await this.scheduleService.getWorkingHoursForDate(date);
   }
 
@@ -163,7 +171,9 @@ export class ScheduleController {
     },
   })
   async getWorkingHours(@Query('date') date: string) {
-    return await this.scheduleService.getWorkingHoursForDate(new Date(date));
+    return await this.scheduleService.getWorkingHoursForDate(
+      this.parseDate(date),
+    );
   }
 
   // ==================== ENDPOINTS PROTEGIDOS ====================
@@ -280,8 +290,8 @@ export class ScheduleController {
     @Query('endDate') endDate?: string,
   ) {
     return await this.scheduleService.findAllBlockedDates(
-      startDate ? new Date(startDate) : undefined,
-      endDate ? new Date(endDate) : undefined,
+      startDate ? this.parseDate(startDate) : undefined,
+      endDate ? this.parseDate(endDate) : undefined,
     );
   }
 
@@ -388,7 +398,7 @@ export class ScheduleController {
   @ApiResponse({ status: 200, description: 'Lista de pausas' })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
   async findBreaksByDate(@Param('date') date: string) {
-    return await this.scheduleService.findBreaksByDate(new Date(date));
+    return await this.scheduleService.findBreaksByDate(this.parseDate(date));
   }
 
   /**

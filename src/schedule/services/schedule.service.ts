@@ -134,11 +134,15 @@ export class ScheduleService {
       .orderBy('blocked_date.blocked_date', 'ASC');
 
     if (startDate) {
-      query.andWhere('blocked_date.blocked_date >= :startDate', { startDate });
+      query.andWhere('blocked_date.blocked_date >= :startDate', {
+        startDate: this.normalizeDate(startDate),
+      });
     }
 
     if (endDate) {
-      query.andWhere('blocked_date.blocked_date <= :endDate', { endDate });
+      query.andWhere('blocked_date.blocked_date <= :endDate', {
+        endDate: this.normalizeDate(endDate),
+      });
     }
 
     return await query.getMany();
@@ -146,7 +150,7 @@ export class ScheduleService {
 
   async isDateBlocked(date: Date): Promise<boolean> {
     const blocked = await this.blockedDateRepository.findOne({
-      where: { blocked_date: date },
+      where: { blocked_date: this.normalizeDate(date) },
     });
     return !!blocked;
   }
@@ -190,7 +194,7 @@ export class ScheduleService {
 
   async findSpecialHoursByDate(date: Date): Promise<SpecialHours | null> {
     return await this.specialHoursRepository.findOne({
-      where: { special_date: date, is_active: true },
+      where: { special_date: this.normalizeDate(date), is_active: true },
     });
   }
 
@@ -235,7 +239,7 @@ export class ScheduleService {
 
   async findBreaksByDate(date: Date): Promise<BreakTime[]> {
     return await this.breakTimeRepository.find({
-      where: { break_date: date },
+      where: { break_date: this.normalizeDate(date) },
       order: { start_time: 'ASC' },
     });
   }
@@ -246,7 +250,10 @@ export class ScheduleService {
   ): Promise<BreakTime[]> {
     return await this.breakTimeRepository.find({
       where: {
-        break_date: Between(startDate, endDate),
+        break_date: Between(
+          this.normalizeDate(startDate),
+          this.normalizeDate(endDate),
+        ),
       },
       order: { break_date: 'ASC', start_time: 'ASC' },
     });
@@ -275,6 +282,8 @@ export class ScheduleService {
     lunch_end?: string;
     reason?: string;
   }> {
+    date = this.normalizeDate(date);
+
     const isBlocked = await this.blockedDateRepository.findOne({
       where: { blocked_date: date, is_full_day: true },
     });
@@ -320,8 +329,7 @@ export class ScheduleService {
    */
   async generateTodaySlots(serviceDuration: number = 30): Promise<string[]> {
     const today = new Date();
-    const dateStr = today.toISOString().split('T')[0];
-    const date = new Date(dateStr);
+    const date = this.normalizeDate(today);
 
     const workingHours = await this.getWorkingHoursForDate(date);
 
@@ -402,6 +410,7 @@ export class ScheduleService {
     date: Date,
     serviceDuration: number = 30,
   ): Promise<string[]> {
+    date = this.normalizeDate(date);
     const workingHours = await this.getWorkingHoursForDate(date);
 
     if (!workingHours.is_working) {
@@ -541,6 +550,12 @@ export class ScheduleService {
     const totalMinutes = this.timeToMinutes(time) + minutes;
     const hours = Math.floor(totalMinutes / 60);
     const mins = totalMinutes % 60;
-    return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+    return `${hours.toString().padStart(2, '0')}:${mins
+      .toString()
+      .padStart(2, '0')}`;
+  }
+
+  private normalizeDate(date: Date): Date {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
   }
 }

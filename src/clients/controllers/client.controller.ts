@@ -13,6 +13,7 @@ import {
   HttpStatus,
   HttpCode,
   UseGuards,
+  Patch,
 } from '@nestjs/common';
 import { ClientsService } from '../services/clients.service';
 import { CreateClientDto } from '../dto/create-client.dto';
@@ -284,7 +285,7 @@ export class ClientsController {
   }
 
   // ❌ PROTEGIDO - Apenas barbeiro
-  @Delete(':id/deactivate')
+  @Patch(':id/deactivate')
   @UseGuards(JwtAuthGuard, BarberGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Desativar cliente (barbeiro)' })
@@ -298,7 +299,7 @@ export class ClientsController {
   }
 
   // ❌ PROTEGIDO - Apenas barbeiro
-  @Post(':id/activate')
+  @Patch(':id/activate')
   @UseGuards(JwtAuthGuard, BarberGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Reativar cliente (barbeiro)' })

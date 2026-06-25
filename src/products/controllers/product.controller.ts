@@ -13,6 +13,7 @@ import {
   HttpStatus,
   HttpCode,
   UseGuards,
+  Patch,
 } from '@nestjs/common';
 import { ProductsService } from '../services/products.service';
 import { CreateProductDto } from '../dto/create-product.dto';
@@ -142,7 +143,7 @@ export class ProductsController {
   }
 
   // ❌ PROTEGIDO - Apenas barbeiro
-  @Put(':id/activate')
+  @Patch(':id/activate')
   @UseGuards(JwtAuthGuard, BarberGuard)
   @ApiOperation({ summary: 'Ativar produto (barbeiro)' })
   @ApiParam({ name: 'id', description: 'ID do produto' })
@@ -154,7 +155,7 @@ export class ProductsController {
   }
 
   // ❌ PROTEGIDO - Apenas barbeiro
-  @Put(':id/deactivate')
+  @Patch(':id/deactivate')
   @UseGuards(JwtAuthGuard, BarberGuard)
   @ApiOperation({ summary: 'Desativar produto (barbeiro)' })
   @ApiParam({ name: 'id', description: 'ID do produto' })

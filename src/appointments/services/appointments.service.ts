@@ -256,13 +256,20 @@ export class AppointmentsService {
   /**
    * Buscar agendamentos do dia
    */
+  // backend/src/appointments/appointments.service.ts
+
   async findToday(): Promise<Appointment[]> {
-    const today = new Date();
+    // ✅ Criar data de hoje no timezone -03:00
+    const now = new Date();
+    const today = new Date(
+      now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }),
+    );
     today.setHours(0, 0, 0, 0);
 
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
+    // ✅ Usar Between com as datas já ajustadas
     return await this.appointmentRepository.find({
       where: {
         appointment_date: Between(today, tomorrow),
@@ -278,16 +285,26 @@ export class AppointmentsService {
     });
   }
 
-  /**
-   * Buscar agendamentos futuros
-   */
+  // backend/src/appointments/appointments.service.ts
+
   async findUpcoming(limit: number = 10): Promise<Appointment[]> {
-    const today = new Date();
+    // ✅ Criar data de hoje no timezone -03:00
+    const now = new Date();
+    const today = new Date(
+      now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }),
+    );
     today.setHours(0, 0, 0, 0);
 
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // ✅ Buscar agendamentos a partir de amanhã
     return await this.appointmentRepository.find({
       where: {
-        appointment_date: MoreThan(today),
+        appointment_date: Between(
+          tomorrow,
+          new Date(tomorrow.getTime() + 30 * 24 * 60 * 60 * 1000),
+        ), // 30 dias
         status: In(['pending', 'confirmed']),
       },
       relations: {

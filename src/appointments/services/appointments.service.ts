@@ -258,65 +258,48 @@ export class AppointmentsService {
    */
   // backend/src/appointments/appointments.service.ts
 
-  async findToday(): Promise<Appointment[]> {
-    // ✅ Criar data de hoje no timezone -03:00
-    const now = new Date();
-    const today = new Date(
-      now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }),
-    );
-    today.setHours(0, 0, 0, 0);
-
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    // ✅ Usar Between com as datas já ajustadas
-    return await this.appointmentRepository.find({
-      where: {
-        appointment_date: Between(today, tomorrow),
-        status: In(['pending', 'confirmed']),
-      },
-      relations: {
-        client: true,
-        service: true,
-      },
-      order: {
-        appointment_time: 'ASC',
-      },
-    });
-  }
-
   // backend/src/appointments/appointments.service.ts
 
-  async findUpcoming(limit: number = 10): Promise<Appointment[]> {
-    // ✅ Criar data de hoje no timezone -03:00
+  async findToday(): Promise<Appointment[]> {
+    // ✅ Obter data de hoje no formato YYYY-MM-DD como string
     const now = new Date();
-    const today = new Date(
-      now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }),
-    );
-    today.setHours(0, 0, 0, 0);
+    const todayStr = now.toLocaleDateString('en-CA', {
+      timeZone: 'America/Sao_Paulo',
+    }); // Retorna YYYY-MM-DD
 
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    // ✅ Usar Query Builder com comparação de string
+    return await this.appointmentRepository
+      .createQueryBuilder('appointment')
+      .leftJoinAndSelect('appointment.client', 'client')
+      .leftJoinAndSelect('appointment.service', 'service')
+      .where('appointment.appointment_date = :todayStr', { todayStr })
+      .andWhere('appointment.status IN (:...status)', {
+        status: ['pending', 'confirmed'],
+      })
+      .orderBy('appointment.appointment_time', 'ASC')
+      .getMany();
+  }
 
-    // ✅ Buscar agendamentos a partir de amanhã
-    return await this.appointmentRepository.find({
-      where: {
-        appointment_date: Between(
-          tomorrow,
-          new Date(tomorrow.getTime() + 30 * 24 * 60 * 60 * 1000),
-        ), // 30 dias
-        status: In(['pending', 'confirmed']),
-      },
-      relations: {
-        client: true,
-        service: true,
-      },
-      order: {
-        appointment_date: 'ASC',
-        appointment_time: 'ASC',
-      },
-      take: limit,
-    });
+  async findUpcoming(limit: number = 10): Promise<Appointment[]> {
+    // ✅ Obter data de hoje no formato YYYY-MM-DD como string
+    const now = new Date();
+    const todayStr = now.toLocaleDateString('en-CA', {
+      timeZone: 'America/Sao_Paulo',
+    }); // Retorna YYYY-MM-DD
+
+    // ✅ Usar Query Builder com comparação de string
+    return await this.appointmentRepository
+      .createQueryBuilder('appointment')
+      .leftJoinAndSelect('appointment.client', 'client')
+      .leftJoinAndSelect('appointment.service', 'service')
+      .where('appointment.appointment_date > :todayStr', { todayStr })
+      .andWhere('appointment.status IN (:...status)', {
+        status: ['pending', 'confirmed'],
+      })
+      .orderBy('appointment.appointment_date', 'ASC')
+      .addOrderBy('appointment.appointment_time', 'ASC')
+      .limit(limit)
+      .getMany();
   }
 
   /**

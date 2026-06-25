@@ -1,11 +1,17 @@
+// backend/src/products/dto/create-product.dto.ts
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNumber, Min, MaxLength } from 'class-validator';
+import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { ProductCategory } from '../entities/product.entity';
 
 export class CreateProductDto {
   @ApiProperty()
   @IsString()
-  @MaxLength(100)
   name: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  description?: string;
 
   @ApiProperty()
   @IsNumber()
@@ -16,4 +22,9 @@ export class CreateProductDto {
   @IsNumber()
   @Min(1)
   duration_minutes: number;
+
+  @ApiProperty({ enum: ProductCategory, default: ProductCategory.OTHER })
+  @IsOptional()
+  @IsEnum(ProductCategory)
+  category?: ProductCategory;
 }

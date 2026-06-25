@@ -1,3 +1,4 @@
+// backend/src/products/entities/product.entity.ts
 import { ApiProperty } from '@nestjs/swagger';
 import {
   Column,
@@ -7,6 +8,16 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Appointment } from '../../appointments/entities/appointment.entity';
+
+export enum ProductCategory {
+  HAIRCUT = 'corte',
+  BEARD = 'barba',
+  COLORING = 'coloracao',
+  TREATMENT = 'tratamento',
+  STYLING = 'estilizacao',
+  PACKAGE = 'pacote',
+  OTHER = 'outros',
+}
 
 @Entity('products')
 export class Product {
@@ -19,12 +30,24 @@ export class Product {
   name: string;
 
   @ApiProperty()
+  @Column({ type: 'text', nullable: true })
+  description: string;
+
+  @ApiProperty()
   @Column({ type: 'decimal', precision: 8, scale: 2 })
   price: number;
 
   @ApiProperty()
   @Column()
   duration_minutes: number;
+
+  @ApiProperty({ enum: ProductCategory })
+  @Column({
+    type: 'enum',
+    enum: ProductCategory,
+    default: ProductCategory.OTHER,
+  })
+  category: ProductCategory;
 
   @ApiProperty()
   @Column({ default: true })

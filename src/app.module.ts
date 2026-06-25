@@ -8,7 +8,6 @@ import { AuthModule } from './auth/auth.module';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { ProdService } from './auth/data/services/prod.service';
-import { DevService } from './auth/data/services/dev.service';
 
 @Module({
   imports: [

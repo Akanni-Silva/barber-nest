@@ -1,8 +1,5 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/restrict-template-expressions */
-/* eslint-disable @typescript-eslint/no-redundant-type-constituents */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+
 // src/schedule/services/schedule.service.ts
 import {
   Injectable,

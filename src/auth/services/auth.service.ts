@@ -197,6 +197,7 @@ export class AuthService {
       where: { email },
     });
   }
+
   /**
    * ✅ Atualizar perfil do barbeiro
    */
@@ -223,9 +224,9 @@ export class AuthService {
       }
     }
 
-    // ✅ Atualizar apenas os campos fornecidos
+    // ✅ CORRIGIDO: usar updateProfileDto em vez de UpdateProfileDto
     if (updateProfileDto.name) {
-      barber.name = UpdateProfileDto.name;
+      barber.name = updateProfileDto.name; // ✅ Antes estava UpdateProfileDto.name
     }
 
     if (updateProfileDto.email) {

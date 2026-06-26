@@ -77,4 +77,14 @@ export class AuthController {
       changePasswordDto,
     );
   }
+
+   /**
+   * ✅ Atualizar perfil do barbeiro
+   */
+  @Put('profile')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  async updateProfile(@Request() req, @Body() updateProfileDto: UpdateProfileDto) {
+    return this.authService.updateProfile(req.user.id, updateProfileDto);
+  }
 }

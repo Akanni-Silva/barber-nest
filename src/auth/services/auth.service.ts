@@ -196,4 +196,55 @@ export class AuthService {
       where: { email },
     });
   }
+/**
+   * ✅ Atualizar perfil do barbeiro
+   */
+  async updateProfile(
+    barberId: number,
+    updateProfileDto: UpdateProfileDto,
+  ): Promise<{ message: string; barber: PublicBarber }> {
+    const barber = await this.barberRepository.findOne({
+      where: { id: barberId },
+    });
+
+    if (!barber) {
+      throw new NotFoundException('Barbeiro não encontrado');
+    }
+
+    // ✅ Verificar se o email já está em uso por outro barbeiro
+    if (updateProfileDto.email) {
+      const existingBarber = await this.barberRepository.findOne({
+        where: { email: updateProfileDto.email },
+      });
+
+      if (existingBarber && existingBarber.id !== barberId) {
+        throw new ConflictException('Email já está em uso por outro barbeiro');
+      }
+    }
+
+    // ✅ Atualizar apenas os campos fornecidos
+    if (updateProfileDto.name) {
+      barber.name = updateProfileDto.name;
+    }
+
+    if (updateProfileDto.email) {
+      barber.email = updateProfileDto.email;
+    }
+
+    if (updateProfileDto.phone) {
+      barber.phone = updateProfileDto.phone;
+    }
+
+    if (updateProfileDto.avatar_url !== undefined) {
+      barber.avatar_url = updateProfileDto.avatar_url;
+    }
+
+    const updatedBarber = await this.barberRepository.save(barber);
+
+    return {
+      message: 'Perfil atualizado com sucesso',
+      barber: removePasswordHash(updatedBarber),
+    };
+  }
+  
 }

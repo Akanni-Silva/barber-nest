@@ -5,6 +5,7 @@ import {
   ConflictException,
   NotFoundException,
   ForbiddenException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -15,6 +16,7 @@ import { RegisterDto } from '../dto/register.dto';
 import { ChangePasswordDto } from '../dto/change-password.dto';
 import { LoginDto } from '../dto/login.dto';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
+import { PublicProfileDto } from '../dto/public-profile.dto';
 
 type PublicBarber = Omit<Barber, 'password_hash'>;
 
@@ -81,6 +83,7 @@ export class AuthService {
       email: registerDto.email,
       password_hash: passwordHash,
       phone: registerDto.phone,
+      whatsapp: registerDto.phone, // ✅ Inicialmente, o WhatsApp é o mesmo que o telefone
       avatar_url: registerDto.avatar_url || undefined,
       is_active: true,
     });
@@ -224,9 +227,8 @@ export class AuthService {
       }
     }
 
-    // ✅ CORRIGIDO: usar updateProfileDto em vez de UpdateProfileDto
     if (updateProfileDto.name) {
-      barber.name = updateProfileDto.name; // ✅ Antes estava UpdateProfileDto.name
+      barber.name = updateProfileDto.name;
     }
 
     if (updateProfileDto.email) {
@@ -241,11 +243,105 @@ export class AuthService {
       barber.avatar_url = updateProfileDto.avatar_url;
     }
 
+    // ✅ Atualizar campos de endereço
+    if (updateProfileDto.address !== undefined) {
+      barber.address = updateProfileDto.address;
+    }
+
+    if (updateProfileDto.address_number !== undefined) {
+      barber.address_number = updateProfileDto.address_number;
+    }
+
+    if (updateProfileDto.neighborhood !== undefined) {
+      barber.neighborhood = updateProfileDto.neighborhood;
+    }
+
+    if (updateProfileDto.city !== undefined) {
+      barber.city = updateProfileDto.city;
+    }
+
+    if (updateProfileDto.state !== undefined) {
+      barber.state = updateProfileDto.state;
+    }
+
+    if (updateProfileDto.zip_code !== undefined) {
+      barber.zip_code = updateProfileDto.zip_code;
+    }
+
+    if (updateProfileDto.working_hours !== undefined) {
+      barber.working_hours = updateProfileDto.working_hours;
+    }
+
+    if (updateProfileDto.whatsapp !== undefined) {
+      barber.whatsapp = updateProfileDto.whatsapp;
+    }
+
+    if (updateProfileDto.instagram !== undefined) {
+      barber.instagram = updateProfileDto.instagram;
+    }
+
+    if (updateProfileDto.facebook !== undefined) {
+      barber.facebook = updateProfileDto.facebook;
+    }
+
+    if (updateProfileDto.google_maps_url !== undefined) {
+      barber.google_maps_url = updateProfileDto.google_maps_url;
+    }
+
     const updatedBarber = await this.barberRepository.save(barber);
 
     return {
       message: 'Perfil atualizado com sucesso',
       barber: removePasswordHash(updatedBarber),
     };
+  }
+
+  /**
+   * ✅ Buscar dados públicos do barbeiro
+   */
+  async getPublicProfile(): Promise<PublicProfileDto> {
+    try {
+      const barber = await this.barberRepository.findOne({
+        where: { is_active: true },
+        // ✅ Usando a sintaxe correta do TypeORM para select
+        select: {
+          name: true,
+          phone: true,
+          avatar_url: true,
+          address: true,
+          address_number: true,
+          neighborhood: true,
+          city: true,
+          state: true,
+          zip_code: true,
+          working_hours: true,
+          whatsapp: true,
+          instagram: true,
+          facebook: true,
+          google_maps_url: true,
+          is_active: true,
+          created_at: true,
+          updated_at: true,
+        },
+      });
+
+      if (!barber) {
+        throw new NotFoundException('Barbearia não encontrada ou inativa');
+      }
+
+      // ✅ Retorna apenas os campos selecionados
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      return barber as PublicProfileDto;
+    } catch (error) {
+      // ✅ Se for uma exceção já conhecida, relançar
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+
+      // ✅ Erro inesperado - lançar InternalServerErrorException
+      throw new InternalServerErrorException(
+        'Erro ao buscar informações da barbearia. Tente novamente mais tarde.',
+      );
+    }
   }
 }

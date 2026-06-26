@@ -21,11 +21,15 @@ import { JwtAuthGuard } from '../guard/jwt-auth.guard';
 import { BarberGuard } from '../guard/barber.guard';
 import {
   ApiBearerAuth,
+  ApiInternalServerErrorResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
   ApiOperation,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
+import { PublicProfileDto } from '../dto/public-profile.dto';
 
 @ApiTags('Autenticacao')
 @ApiBearerAuth()
@@ -90,5 +94,25 @@ export class AuthController {
     @Body() updateProfileDto: UpdateProfileDto,
   ) {
     return this.authService.updateProfile(req.user.id, updateProfileDto);
+  }
+
+  @Get('public-profile')
+  @ApiOperation({
+    summary: '🔓 Buscar informações públicas da barbearia',
+    description:
+      'Retorna apenas dados públicos como nome, endereço, telefone e redes sociais. NUNCA retorna email, id ou dados sensíveis.',
+  })
+  @ApiOkResponse({
+    description: 'Informações encontradas com sucesso',
+    type: PublicProfileDto,
+  })
+  @ApiNotFoundResponse({
+    description: 'Barbearia não encontrada ou inativa',
+  })
+  @ApiInternalServerErrorResponse({
+    description: 'Erro interno ao buscar informações',
+  })
+  async getPublicProfile(): Promise<PublicProfileDto> {
+    return await this.authService.getPublicProfile();
   }
 }

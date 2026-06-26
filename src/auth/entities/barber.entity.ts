@@ -30,7 +30,7 @@ export class Barber {
   phone: string;
 
   @ApiProperty({ required: false })
-  @Column({ nullable: true, length: 255 })
+  @Column({ type: 'text', nullable: true })
   avatar_url: string;
 
   @ApiProperty()

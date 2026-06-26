@@ -25,6 +25,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { UpdateProfileDto } from '../dto/update-profile.dto';
 
 @ApiTags('Autenticacao')
 @ApiBearerAuth()
@@ -78,13 +79,16 @@ export class AuthController {
     );
   }
 
-   /**
+  /**
    * ✅ Atualizar perfil do barbeiro
    */
-  @Put('profile')
+  @Patch('profile')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  async updateProfile(@Request() req, @Body() updateProfileDto: UpdateProfileDto) {
+  async updateProfile(
+    @Request() req,
+    @Body() updateProfileDto: UpdateProfileDto,
+  ) {
     return this.authService.updateProfile(req.user.id, updateProfileDto);
   }
 }

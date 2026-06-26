@@ -14,6 +14,7 @@ import { Bcrypt } from '../bcrypt/bcrypt';
 import { RegisterDto } from '../dto/register.dto';
 import { ChangePasswordDto } from '../dto/change-password.dto';
 import { LoginDto } from '../dto/login.dto';
+import { UpdateProfileDto } from '../dto/update-profile.dto';
 
 type PublicBarber = Omit<Barber, 'password_hash'>;
 
@@ -196,7 +197,7 @@ export class AuthService {
       where: { email },
     });
   }
-/**
+  /**
    * ✅ Atualizar perfil do barbeiro
    */
   async updateProfile(
@@ -224,7 +225,7 @@ export class AuthService {
 
     // ✅ Atualizar apenas os campos fornecidos
     if (updateProfileDto.name) {
-      barber.name = updateProfileDto.name;
+      barber.name = UpdateProfileDto.name;
     }
 
     if (updateProfileDto.email) {
@@ -246,5 +247,4 @@ export class AuthService {
       barber: removePasswordHash(updatedBarber),
     };
   }
-  
 }

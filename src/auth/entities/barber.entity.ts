@@ -104,6 +104,6 @@ export class Barber {
   reset_password_token: string;
 
   @ApiProperty({ required: false })
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   reset_password_expires: Date | null;
 }

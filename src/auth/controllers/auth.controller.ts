@@ -1,3 +1,4 @@
+// src/auth/controllers/auth.controller.ts
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 // src/auth/controllers/auth.controller.ts
@@ -27,9 +28,12 @@ import {
   ApiOperation,
   ApiResponse,
   ApiTags,
+  ApiBadRequestResponse,
 } from '@nestjs/swagger';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { PublicProfileDto } from '../dto/public-profile.dto';
+import { ForgotPasswordDto } from '../dto/forgot-password.dto';
+import { ResetPasswordDto } from '../dto/reset-password.dto';
 
 @ApiTags('Autenticacao')
 @ApiBearerAuth()
@@ -83,12 +87,13 @@ export class AuthController {
     );
   }
 
-  /**
-   * ✅ Atualizar perfil do barbeiro
-   */
   @Patch('profile')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @ApiOperation({ summary: 'Atualizar perfil do barbeiro' })
+  @ApiResponse({ status: 200, description: 'Perfil atualizado com sucesso' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 404, description: 'Barbeiro não encontrado' })
   async updateProfile(
     @Request() req,
     @Body() updateProfileDto: UpdateProfileDto,
@@ -114,5 +119,61 @@ export class AuthController {
   })
   async getPublicProfile(): Promise<PublicProfileDto> {
     return await this.authService.getPublicProfile();
+  }
+
+  /**
+   * ✅ Solicitar recuperação de senha
+   * 🔒 NUNCA retorna a senha do usuário
+   * 📧 Envia um email com link de redefinição
+   * 🔓 Endpoint público - não requer autenticação
+   */
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: '🔓 Solicitar recuperação de senha',
+    description:
+      'Envia um email com link para redefinir a senha. NUNCA retorna a senha do usuário.',
+  })
+  @ApiOkResponse({
+    description: 'Solicitação processada com sucesso',
+    schema: {
+      example: {
+        message: 'Se o email existir, um link de recuperação será enviado.',
+      },
+    },
+  })
+  @ApiBadRequestResponse({
+    description: 'Email inválido',
+  })
+  async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+    return await this.authService.forgotPassword(forgotPasswordDto);
+  }
+
+  /**
+   * ✅ Redefinir senha com token
+   * 🔒 NUNCA retorna a senha do usuário
+   * 🔑 Token é obrigatório e tem expiração
+   * 🔓 Endpoint público - não requer autenticação
+   */
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: '🔓 Redefinir senha com token',
+    description:
+      'Redefine a senha usando um token válido. NUNCA retorna a senha do usuário.',
+  })
+  @ApiOkResponse({
+    description: 'Senha redefinida com sucesso',
+    schema: {
+      example: {
+        message: 'Senha redefinida com sucesso!',
+      },
+    },
+  })
+  @ApiBadRequestResponse({
+    description: 'Token inválido, expirado ou senhas não coincidem',
+  })
+  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+    return await this.authService.resetPassword(resetPasswordDto);
   }
 }

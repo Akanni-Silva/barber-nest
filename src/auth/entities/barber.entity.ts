@@ -97,4 +97,13 @@ export class Barber {
   @ApiProperty()
   @UpdateDateColumn()
   updated_at: Date;
+
+  // ✅ Campos para recuperação de senha
+  @ApiProperty({ required: false })
+  @Column({ length: 255, nullable: true })
+  reset_password_token: string;
+
+  @ApiProperty({ required: false })
+  @Column({ type: 'datetime', nullable: true })
+  reset_password_expires: Date | null;
 }

@@ -14,7 +14,7 @@ import { DevService } from './auth/data/services/dev.service';
   imports: [
     ConfigModule.forRoot(),
     TypeOrmModule.forRootAsync({
-      useClass: ProdService,
+      useClass: DevService,
       imports: [ConfigModule],
     }),
     AuthModule,

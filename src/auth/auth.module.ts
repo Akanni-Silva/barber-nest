@@ -11,6 +11,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Module } from '@nestjs/common';
 import { LocalStrategy } from './strategy/local.strategy';
 import { JwtStrategy } from './strategy/jwt.strategy';
+import { EmailService } from './services/email.service';
 
 @Module({
   imports: [
@@ -24,7 +25,7 @@ import { JwtStrategy } from './strategy/jwt.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [Bcrypt, AuthService, LocalStrategy, JwtStrategy],
+  providers: [Bcrypt, AuthService, LocalStrategy, JwtStrategy, EmailService],
   exports: [AuthService, Bcrypt, JwtModule, PassportModule],
 })
 export class AuthModule {}
